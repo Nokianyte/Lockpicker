@@ -2,6 +2,8 @@
 
 A mouse-wheel arcade game built in **Godot 4.7.2**. Rotate the shrinking polygon, line up its opening, and launch the dot before the walls close in.
 
+**[Play in your browser](https://nokianyte.github.io/Lockpicker/)** · [Source on GitHub](https://github.com/Nokianyte/Lockpicker)
+
 ## Controls
 
 - **Scroll:** rotate the nearest polygon.

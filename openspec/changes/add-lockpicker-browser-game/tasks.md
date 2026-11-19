@@ -32,7 +32,7 @@
 
 ## 6. GitHub publication
 
-- [ ] 6.1 Inspect remote/account context and resolve repository owner, name, and visibility with the user if not already established; verify Pages availability.
+- [x] 6.1 Inspect remote/account context and resolve repository owner, name, and visibility with the user if not already established; verify Pages availability.
 - [x] 6.2 Add a reproducible GitHub Actions export-and-Pages deployment workflow using the pinned engine and matching templates.
-- [ ] 6.3 Document local run/export steps, controls, tested browser and engine versions, and deployment setup; publish source to the selected GitHub repository.
-- [ ] 6.4 Deploy to Pages, verify assets load under the final repository URL, complete a hosted play-and-restart smoke test, and record the playable link in the README.
+- [x] 6.3 Document local run/export steps, controls, tested browser and engine versions, and deployment setup; publish source to the selected GitHub repository.
+- [x] 6.4 Deploy to Pages, verify assets load under the final repository URL, complete a hosted play-and-restart smoke test, and record the playable link in the README.

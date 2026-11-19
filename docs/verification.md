@@ -22,4 +22,6 @@ Install Playwright into the ignored `.tools` directory and its test browsers, se
 
 ## Hosted build
 
-Deployment and hosted smoke-test results are recorded after the GitHub Pages workflow completes.
+- [Build and deployment run 44532220947](https://github.com/Nokianyte/Lockpicker/actions/runs/44532220947) passed on 2026-11-19, including the Linux import, simulation checks, web export, and Pages deployment.
+- [Live game](https://nokianyte.github.io/Lockpicker/) passed the Chrome play/clear/game-over/restart/resize/pause/resume smoke test with no JavaScript errors or page scrolling.
+- Hosted assets resolve correctly under `/Lockpicker/`; the final game pack excludes screenshots, tooling, and planning files.

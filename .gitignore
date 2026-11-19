@@ -1,0 +1,7 @@
+.godot/
+build/
+.tools/
+test-results/
+export_credentials.cfg
+*.tmp
+.agents/

@@ -19,8 +19,9 @@ const fs = require('node:fs');
   await page.screenshot({ path: `test-results/${engine}-title.png` });
   await page.mouse.click(550, 450, { button: 'middle' });
   await page.waitForTimeout(150);
-  // Six 7.5-degree notches undo the first wall's 45-degree offset.
-  for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, -120); await page.waitForTimeout(30); }
+  // One notch advances one full side, undoing the first wall's 60-degree offset.
+  await page.mouse.wheel(0, -120);
+  await page.waitForTimeout(100);
   await page.screenshot({ path: `test-results/${engine}-aim.png` });
   await page.mouse.click(550, 450, { button: 'middle' });
   await page.waitForTimeout(500);

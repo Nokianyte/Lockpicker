@@ -15,7 +15,14 @@ func check(condition: bool, message: String) -> void:
 func _initialize() -> void:
 	var game = Model.new()
 	game.reset(7)
-	game.walls[0].angle = -PI / 2.0
+	var initial_angle: float = game.walls[0].angle
+	var outer_angle: float = game.walls[1].angle
+	game.rotate(1)
+	check(is_equal_approx(angle_difference(initial_angle, game.walls[0].angle), PI / 3.0), "one notch advances one hexagon side")
+	game.rotate(-1)
+	check(is_equal_approx(game.walls[0].angle, initial_angle), "opposite notch reverses one side")
+	check(game.walls[1].angle == outer_angle, "wheel leaves outer walls unchanged")
+	game.rotate(-1)
 	game.press()
 	game.press()
 	for i in range(100):
@@ -72,7 +79,13 @@ func _initialize() -> void:
 	# Long seeded progression exposes spacing, numeric, and generation failures.
 	game.reset(12)
 	for layer in range(100):
-		game.walls[0].angle = -PI / 2
+		var aligned := false
+		for notch in range(6):
+			if absf(angle_difference(game.walls[0].angle, -PI / 2)) < 0.0001:
+				aligned = true
+				break
+			game.rotate(1)
+		check(aligned, "generated gap is reachable in whole-side steps")
 		game.press()
 		for frame in range(10000):
 			game.step(1.0 / 60)

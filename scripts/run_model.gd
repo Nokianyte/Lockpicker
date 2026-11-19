@@ -33,14 +33,15 @@ func reset(seed_value: int = 0) -> void:
 	for i in range(T.WALL_COUNT):
 		append_wall()
 	# A gentle first alignment teaches the wheel without an automatic free clear.
-	walls[0].angle = -PI / 2.0 + PI / 4.0
+	walls[0].angle = -PI / 2.0 + T.WHEEL_STEP
 
 func append_wall() -> void:
 	var radius: float = T.INITIAL_RADIUS
 	if not walls.is_empty():
 		var last: float = walls[-1].radius
 		radius = maxf(last + T.WALL_SPACING, last * 1.25 + 32.0)
-	walls.append({"radius": radius, "angle": rng.randf_range(-PI, PI)})
+	# Every generated gap must be reachable using whole-side wheel steps.
+	walls.append({"radius": radius, "angle": wrapf(-PI / 2.0 + rng.randi_range(0, 5) * T.WHEEL_STEP, -PI, PI)})
 
 func press() -> void:
 	if paused:

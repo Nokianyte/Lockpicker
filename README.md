@@ -6,7 +6,7 @@ A mouse-wheel arcade game built in **Godot 4.7.2**. Rotate the shrinking polygon
 
 ## Controls
 
-- **Scroll:** rotate the nearest polygon.
+- **Scroll:** rotate the nearest polygon by one full side (60°) per notch.
 - **Press the scroll wheel:** start, launch, resume, or restart.
 - A missed launch bounces back and costs time. A successful escape breaks the wall and earns one point.
 - The game pauses when focus is lost. Press the wheel to resume.

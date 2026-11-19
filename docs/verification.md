@@ -5,7 +5,7 @@
 - Godot 4.7.2 stable, standard GDScript build; Compatibility renderer.
 - Headless project import and startup pass without script errors.
 - Single-threaded Web release export succeeds with matching 4.7.2 templates.
-- Deterministic suite: **420 checks, 0 failures**. Includes 100 consecutive seeded escapes, nested-wall spacing, late launches, solid and gap-edge impacts, tunneling prevention, bounce/recovery crushing, pause/resume, restart, and 30/60/120/240 FPS runs.
+- Deterministic suite: **523 checks, 0 failures**. Includes one-side wheel steps in both directions, unchanged outer-wall orientation, 100 consecutive seeded escapes aligned through actual wheel-step calls, nested-wall spacing, late launches, solid and gap-edge impacts, tunneling prevention, bounce/recovery crushing, pause/resume, restart, and 30/60/120/240 FPS runs.
 - Long-run testing exposed unbounded arena growth. Uniform coordinate rescaling after each escape fixes it; visual zoom preserves continuity.
 
 ## Local browser checks
@@ -15,6 +15,8 @@ Automated browser mouse-wheel and middle-button events were exercised in install
 Browser checks found and fixed missing explicit web focus handling and a missing favicon request. Header/footer backgrounds keep moving walls away from text.
 
 These are automated input checks, not a human test of a physical wheel. Physical-device feel and sensitivity still need user playtesting; implementation task 5.3 remains open for that portion. Browser-level automated checks also do not replace the deterministic collision suite.
+
+User playtesting requested one polygon side per notch instead of fine angular increments. The control now advances 60 degrees per notch, generated gaps use the same six-position grid, and the first wall takes one upward notch to align. Updated physical-device acceptance remains pending.
 
 ## Repeat browser checks
 

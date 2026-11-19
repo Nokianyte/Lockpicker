@@ -12,7 +12,7 @@ The game SHALL display a dot inside multiple nested polygon walls with visible g
 - **THEN** the remaining walls move inward and reduce the available escape time
 
 ### Requirement: Wheel rotation and launch
-Scrolling in opposite directions SHALL rotate the innermost remaining polygon in opposite directions without rotating the outer walls. Pressing the middle mouse button SHALL launch the ready dot along its visibly indicated outward path. Holding the button SHALL NOT repeatedly launch, and additional presses during a launch or bounce SHALL NOT queue attempts.
+Each scroll-wheel notch SHALL rotate the innermost remaining polygon by exactly one side (60 degrees for a hexagon). Opposite scroll directions SHALL rotate in opposite directions without rotating the outer walls. Generated gap orientations SHALL be reachable using these whole-side steps. Pressing the middle mouse button SHALL launch the ready dot along its visibly indicated outward path. Holding the button SHALL NOT repeatedly launch, and additional presses during a launch or bounce SHALL NOT queue attempts.
 
 #### Scenario: Align and launch
 - **WHEN** the player scrolls while the dot is ready and then presses the wheel

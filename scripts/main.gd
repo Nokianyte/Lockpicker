@@ -39,6 +39,8 @@ func _input(event: InputEvent) -> void:
 					trail.clear()
 					camera_dot = Vector2.ZERO
 					visual_zoom = 1.0
+					last_bounces = 0
+					hit_flash = 0.0
 				middle_down = true
 			elif not event.pressed:
 				middle_down = false

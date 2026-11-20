@@ -21,6 +21,8 @@ Disable aiming changes during an unresolved attempt for predictable geometry. Ig
 ### Stable outward path and camera
 Working presentation assumption: the dot launches upward along a short visible guide, remains at its successful crossing position, and the camera smoothly follows it. Remaining walls keep their shared world center; camera movement never changes collision coordinates. For each attempt, compute the next wall intersection along the upward ray. Stop a successful launch just outside the cleared wall and inside the next. Maintain sufficient wall spacing for this landing and a subsequent attempt. Prefer this over teleporting the dot back to the arena center, which would obscure the physical crossing described by the user.
 
+The camera applies the full dot-position offset around the exact viewport midpoint, with exponential follow and a small settling threshold. This returns the dot to screen center after both dash and bounce; there is no persistent vertical framing offset.
+
 ### Endless wall generation and bounded difficulty
 Maintain a small queue of nested walls, adding a new outer wall after each clear. Randomize gap orientation, retain gaps wider than the dot, and validate nesting and landing clearance. Increase shrink speed with score up to a tuned maximum. Keep initial radii, spacing, wall width, gap size, wheel sensitivity, launch speed, bounce duration, and difficulty curve as named tuning values. Use seeded generation in checks to reproduce failures. Tune exact values through browser playtesting rather than treating guessed numbers as requirements.
 
@@ -31,6 +33,9 @@ Map each wheel up/down notch to one full polygon side (60 degrees for the hexago
 
 ### GitHub delivery
 Keep source, export preset, and build instructions in Git; exclude editor caches and generated exports. Add a GitHub Actions workflow that uses the pinned engine/templates, exports the web game, and deploys the artifact to Pages. Use relative asset paths and verify the actual repository subpath URL. Repository destination and visibility are deployment inputs to resolve from existing remote/account context or with the user before remote creation. GitHub account authorization and Pages availability must be verified during implementation.
+
+### Smooth turns
+Animate each 60-degree input with a 160 ms smoothstep interpolation in the simulation. Rapid wheel events accumulate the requested angle without losing steps; reversals retarget from the current angle. Swept collision includes angular wall motion as well as shrinking and dot movement. A middle-button press during turning buffers a single launch until the rotation finishes; pause clears that buffered launch. Shrinking continues throughout the turn.
 
 ## Risks / Trade-offs
 

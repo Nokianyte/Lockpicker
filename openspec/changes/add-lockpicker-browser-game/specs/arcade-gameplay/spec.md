@@ -18,6 +18,11 @@ Each scroll-wheel notch SHALL rotate the innermost remaining polygon by exactly 
 - **WHEN** the player scrolls while the dot is ready and then presses the wheel
 - **THEN** the nearest polygon rotates and the dot launches along the indicated path
 
+#### Scenario: Smooth side turns
+- **WHEN** the player scrolls one or several notches
+- **THEN** the polygon animates smoothly to the corresponding whole-side orientation, with matching visible and collision geometry
+- **AND** a middle-button press during the turn launches once after the turn settles
+
 #### Scenario: Repeated input during an attempt
 - **WHEN** the player presses or holds the wheel during an unresolved attempt
 - **THEN** no additional launch is started or queued
@@ -50,6 +55,13 @@ A shrinking wall reaching the resting dot or overtaking it during recovery SHALL
 #### Scenario: Crushed during bounce
 - **WHEN** a shrinking wall overtakes the returning dot
 - **THEN** the run ends instead of granting immunity until the bounce finishes
+
+### Requirement: Camera recenters after movement
+The camera SHALL smoothly bring the dot back to the center of the screen after a successful dash or a completed bounce, without changing its gameplay position or wall spacing.
+
+#### Scenario: Dash or bounce finishes
+- **WHEN** the dot completes its movement and remains at rest
+- **THEN** its screen position settles at the viewport center while the walls continue shrinking
 
 ### Requirement: Endless progression and restart
 The game SHALL replenish outer walls for endless play, gradually increase shrink speed with layers cleared, and retain traversable gaps and room for the next attempt. Pressing the wheel from the start or game-over screen SHALL start a fresh run at zero score and initial difficulty without also launching the dot.

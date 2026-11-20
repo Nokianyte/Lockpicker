@@ -29,13 +29,15 @@ static func distance_to_wall(p: Vector2, radius: float, rotation: float) -> floa
 		result = minf(result, p.distance_to(Geometry2D.get_closest_point_to_segment(p, segment[0], segment[1])))
 	return result
 
-static func swept_hit(from: Vector2, to: Vector2, old_radius: float, new_radius: float, rotation: float, clearance: float) -> float:
+static func swept_hit(from: Vector2, to: Vector2, old_radius: float, new_radius: float, rotation: float, clearance: float, old_rotation: float = NAN) -> float:
 	# Conservative advancement: a distance bound covers both dot and wall motion.
 	# Unlike discrete endpoint tests, this cannot step over a thin wall.
-	var bound := from.distance_to(to) + absf(new_radius - old_radius)
+	var start_angle := rotation if is_nan(old_rotation) else old_rotation
+	var angle_delta := angle_difference(start_angle, rotation)
+	var bound := from.distance_to(to) + absf(new_radius - old_radius) + maxf(old_radius, new_radius) * absf(angle_delta)
 	var t := 0.0
 	for iteration in range(128):
-		var distance := distance_to_wall(from.lerp(to, t), lerpf(old_radius, new_radius, t), rotation) - clearance
+		var distance := distance_to_wall(from.lerp(to, t), lerpf(old_radius, new_radius, t), start_angle + angle_delta * t) - clearance
 		if distance <= 0.001:
 			return t
 		if bound < 0.00001:

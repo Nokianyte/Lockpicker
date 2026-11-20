@@ -36,3 +36,9 @@
 - [x] 6.2 Add a reproducible GitHub Actions export-and-Pages deployment workflow using the pinned engine and matching templates.
 - [x] 6.3 Document local run/export steps, controls, tested browser and engine versions, and deployment setup; publish source to the selected GitHub repository.
 - [x] 6.4 Deploy to Pages, verify assets load under the final repository URL, complete a hosted play-and-restart smoke test, and record the playable link in the README.
+
+## 7. Playtest refinements
+
+- [x] 7.1 Animate whole-side turns with consistent collision geometry and preserve rapid wheel inputs.
+- [x] 7.2 Smoothly recenter the dot on screen after dashes and bounces without teleporting its gameplay position.
+- [ ] 7.3 Verify turning, buffered launch, and screen centering; publish the updated browser build.

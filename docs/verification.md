@@ -1,5 +1,13 @@
 # Verification
 
+## Smooth turns and centering — 2026-11-20
+
+- Turns now ease over 160 ms while preserving one 60-degree side per notch. Collision follows the animated angle; rapid inputs and reversals preserve their requested side count.
+- Clicking during a turn buffers one launch until it finishes. Pause clears a buffered launch.
+- Camera follow now settles at the exact viewport midpoint after dash and bounce, without changing world-space movement.
+- **570 deterministic checks pass**, including angular collision, turn interpolation, pause/buffer behavior, and 40 impact timings. The latter reproduced and fixed false crushing when the wall's remaining movement within an impact tick overlapped the rebounding dot.
+- Local Chrome, Edge, and Firefox browser checks pass without script errors. Screenshot-based dot measurements after settling are within one pixel of the center after bounce and at the center after dash.
+
 ## Build and simulation — 2026-11-19
 
 - Godot 4.7.2 stable, standard GDScript build; Compatibility renderer.

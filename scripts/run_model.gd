@@ -14,6 +14,11 @@ var cleared: Array = []
 var bounce_count := 0
 var elapsed := 0.0
 var space_scale := 1.0
+var turning := false
+var turn_from := 0.0
+var turn_target := 0.0
+var turn_elapsed := 0.0
+var buffered_launch := false
 
 func _init() -> void:
 	reset(42)
@@ -28,6 +33,9 @@ func reset(seed_value: int = 0) -> void:
 	bounce_count = 0
 	elapsed = 0.0
 	space_scale = 1.0
+	turning = false
+	buffered_launch = false
+	turn_elapsed = 0.0
 	paused = false
 	state = State.READY
 	for i in range(T.WALL_COUNT):
@@ -50,12 +58,24 @@ func press() -> void:
 	if state == State.TITLE or state == State.OVER:
 		reset()
 	elif state == State.READY:
-		launch_origin = dot
-		state = State.LAUNCHING
+		if turning:
+			buffered_launch = true
+		else:
+			_begin_launch()
+
+func _begin_launch() -> void:
+	buffered_launch = false
+	launch_origin = dot
+	state = State.LAUNCHING
 
 func rotate(direction: float) -> void:
-	if state == State.READY and not paused:
-		walls[0].angle = wrapf(walls[0].angle + direction * T.WHEEL_STEP, -PI, PI)
+	if state == State.READY and not paused and not buffered_launch:
+		if not turning:
+			turn_target = walls[0].angle
+		turn_from = walls[0].angle
+		turn_target += direction * T.WHEEL_STEP
+		turn_elapsed = 0.0
+		turning = true
 
 func speed() -> float:
 	return minf(T.INITIAL_SPEED + score * 0.65, T.MAX_SPEED)
@@ -74,6 +94,15 @@ func _tick(dt: float) -> void:
 	elapsed += dt
 	var wall: Dictionary = walls[0]
 	var old_radius: float = wall.radius
+	var old_angle: float = wall.angle
+	if turning:
+		turn_elapsed = minf(turn_elapsed + dt, T.TURN_DURATION)
+		var progress := turn_elapsed / T.TURN_DURATION
+		var eased := progress * progress * (3.0 - 2.0 * progress)
+		wall.angle = lerpf(turn_from, turn_target, eased)
+		if turn_elapsed >= T.TURN_DURATION:
+			wall.angle = wrapf(turn_target, -PI, PI)
+			turning = false
 	for entry in walls:
 		entry.radius = maxf(0.0, entry.radius - speed() * dt)
 	var previous := dot
@@ -82,12 +111,14 @@ func _tick(dt: float) -> void:
 	elif state == State.BOUNCING:
 		dot = dot.move_toward(launch_origin, T.BOUNCE_SPEED * dt)
 	var clearance := T.DOT_RADIUS + T.WALL_WIDTH / 2.0
-	var hit := G.swept_hit(previous, dot, old_radius, wall.radius, wall.angle, clearance)
+	var hit := G.swept_hit(previous, dot, old_radius, wall.radius, wall.angle, clearance, old_angle)
 	if hit >= 0.0:
 		if state == State.LAUNCHING:
 			dot = previous.lerp(dot, maxf(0.0, hit - 0.001))
-			# Move just inside the contact surface so recovery starts separated.
-			dot.y += 0.05
+			# The collision is at a fraction of the tick, but walls are already at
+			# their end-of-tick radii. Account for that remaining wall travel so
+			# recovery starts separated rather than falsely crushed next tick.
+			dot.y += (old_radius - wall.radius) * (1.0 - hit) + 0.05
 			state = State.BOUNCING
 			bounce_count += 1
 		else:
@@ -117,7 +148,10 @@ func _tick(dt: float) -> void:
 			space_scale *= factor
 	elif state == State.BOUNCING and dot.distance_to(launch_origin) < 0.01:
 		state = State.READY
+	if state == State.READY and not turning and buffered_launch:
+		_begin_launch()
 
 func pause() -> void:
 	if state != State.TITLE and state != State.OVER:
 		paused = true
+		buffered_launch = false

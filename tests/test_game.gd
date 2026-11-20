@@ -18,13 +18,19 @@ func _initialize() -> void:
 	var initial_angle: float = game.walls[0].angle
 	var outer_angle: float = game.walls[1].angle
 	game.rotate(1)
+	check(is_equal_approx(game.walls[0].angle, initial_angle), "scroll starts a turn without snapping")
+	game.step(T.TURN_DURATION / 2.0)
+	check(angle_difference(initial_angle, game.walls[0].angle) > 0.0 and angle_difference(initial_angle, game.walls[0].angle) < PI / 3.0, "turn has an intermediate angle")
+	game.step(T.TURN_DURATION)
 	check(is_equal_approx(angle_difference(initial_angle, game.walls[0].angle), PI / 3.0), "one notch advances one hexagon side")
 	game.rotate(-1)
+	game.step(T.TURN_DURATION + 0.01)
 	check(is_equal_approx(game.walls[0].angle, initial_angle), "opposite notch reverses one side")
 	check(game.walls[1].angle == outer_angle, "wheel leaves outer walls unchanged")
 	game.rotate(-1)
 	game.press()
 	game.press()
+	check(game.buffered_launch and game.state == Model.State.READY, "click during a turn waits for alignment")
 	for i in range(100):
 		game.step(1.0 / 120.0)
 		if game.score > 0:
@@ -42,6 +48,13 @@ func _initialize() -> void:
 	check(game.bounce_count == 1 and game.score == 0, "solid hit bounces without scoring")
 	check(game.state == Model.State.READY and game.dot.is_equal_approx(Vector2.ZERO), "bounce returns to origin")
 	check(game.walls[0].radius < initial, "shrinking continues during bounce")
+	for phase in range(40):
+		var phased = Model.new()
+		phased.reset(7)
+		phased.step(phase * 0.01)
+		phased.press()
+		phased.step(1.0)
+		check(phased.state == Model.State.READY and phased.bounce_count == 1, "early bounce survives different impact timing %d" % phase)
 	game.pause()
 	var frozen: float = game.walls[0].radius
 	game.step(5)
@@ -63,6 +76,24 @@ func _initialize() -> void:
 	check(G.swept_hit(endpoint + Vector2(0, 40), endpoint - Vector2(0, 40), 180, 180, -PI / 2, 7.5) >= 0, "gap endpoint is solid")
 	check(G.swept_hit(Vector2.ZERO, Vector2(0, -300), 180, 175, 0, 7.5) >= 0, "fast launch cannot tunnel through wall")
 	check(G.swept_hit(Vector2.ZERO, Vector2(0, -300), 180, 175, -PI / 2, 7.5) < 0, "aligned swept path remains open")
+	check(G.swept_hit(Vector2(0, -165), Vector2(0, -165), 180, 180, PI / 3, 6, 0) >= 0, "rotating corner cannot tunnel through a resting dot")
+	game.reset(33)
+	initial_angle = game.walls[0].angle
+	for i in range(3):
+		game.rotate(1)
+	game.step(0.04)
+	game.rotate(-1)
+	game.step(0.2)
+	check(absf(angle_difference(game.walls[0].angle, initial_angle + 2 * PI / 3)) < 0.0001, "rapid notches and reversal preserve intended side count")
+	game.rotate(-1)
+	game.press()
+	game.pause()
+	var paused_angle: float = game.walls[0].angle
+	game.step(1)
+	check(game.walls[0].angle == paused_angle, "pause freezes rotation")
+	game.press()
+	game.step(0.2)
+	check(game.state == Model.State.READY and not game.buffered_launch, "resume does not fire a stale buffered launch")
 	for fps in [30, 60, 120, 240]:
 		game.reset(8)
 		game.walls[0].angle = -PI / 2
@@ -85,6 +116,7 @@ func _initialize() -> void:
 				aligned = true
 				break
 			game.rotate(1)
+			game.step(T.TURN_DURATION + 0.01)
 		check(aligned, "generated gap is reachable in whole-side steps")
 		game.press()
 		for frame in range(10000):

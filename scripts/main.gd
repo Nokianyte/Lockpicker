@@ -79,6 +79,8 @@ func _process(delta: float) -> void:
 	clock += delta
 	visual_zoom = lerpf(visual_zoom, 1.0, 1.0 - exp(-delta * 7.0))
 	camera_dot = camera_dot.lerp(game.dot, 1.0 - exp(-delta * 9.0))
+	if camera_dot.distance_to(game.dot) < 0.05:
+		camera_dot = game.dot
 	if not game.paused:
 		hit_flash = maxf(0.0, hit_flash - delta)
 		for effect in effects:
@@ -99,11 +101,11 @@ func centered(value: String, y: float, size: int, color: Color = INK) -> void:
 
 func _draw() -> void:
 	var size := get_viewport_rect().size
-	var center := size * Vector2(0.5, 0.56)
+	var center := size * 0.5
 	var ui_scale := minf(size.x / 1100.0, size.y / 800.0)
 	var radius: float = game.walls[0].radius
 	var zoom := minf(1.0, 280.0 / maxf(radius, 1.0)) * ui_scale * visual_zoom
-	var origin := center - camera_dot * zoom * 0.75
+	var origin := center - camera_dot * zoom
 	# Quiet graph-paper texture and corner registration marks.
 	for x in range(24, int(size.x), 32):
 		for y in range(24, int(size.y), 32):

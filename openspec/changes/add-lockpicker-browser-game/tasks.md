@@ -41,4 +41,4 @@
 
 - [x] 7.1 Animate whole-side turns with consistent collision geometry and preserve rapid wheel inputs.
 - [x] 7.2 Smoothly recenter the dot on screen after dashes and bounces without teleporting its gameplay position.
-- [ ] 7.3 Verify turning, buffered launch, and screen centering; publish the updated browser build.
+- [x] 7.3 Verify turning, buffered launch, and screen centering; publish the updated browser build.

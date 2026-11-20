@@ -7,6 +7,7 @@
 - Camera follow now settles at the exact viewport midpoint after dash and bounce, without changing world-space movement.
 - **570 deterministic checks pass**, including angular collision, turn interpolation, pause/buffer behavior, and 40 impact timings. The latter reproduced and fixed false crushing when the wall's remaining movement within an impact tick overlapped the rebounding dot.
 - Local Chrome, Edge, and Firefox browser checks pass without script errors. Screenshot-based dot measurements after settling are within one pixel of the center after bounce and at the center after dash.
+- [Deployment 44787977224](https://github.com/Nokianyte/Lockpicker/actions/runs/44787977224) passed. The hosted Chrome smoke test also passes: measured center offset after bounce is under 0.1 pixels, and after dash is zero, with no script errors.
 
 ## Build and simulation — 2026-11-19
 

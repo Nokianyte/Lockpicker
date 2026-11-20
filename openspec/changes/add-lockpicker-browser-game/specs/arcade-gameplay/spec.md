@@ -38,7 +38,7 @@ When the innermost layer reaches the sharp tip, its gap MUST be aligned with the
 - **THEN** the run ends without awarding a point for that layer
 
 ### Requirement: Endless progression and restart
-The game SHALL replenish outer layers and increase normal shrink speed with score up to a playable limit. Clicking the wheel from the start or game-over screen SHALL start a fresh run at zero score and initial difficulty. Starting, restarting, and resuming SHALL require a fresh press to activate the boost.
+The game SHALL replenish outer layers and shorten the normal aiming window as score increases, down to a playable minimum. An early drop SHALL still leave the next layer's aiming window intact. Clicking the wheel from the start or game-over screen SHALL start a fresh run at zero score and initial difficulty. Starting, restarting, and resuming SHALL require a fresh press to activate the boost.
 
 #### Scenario: Restart
 - **WHEN** the player presses the wheel after game over

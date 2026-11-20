@@ -29,12 +29,17 @@ func _initialize() -> void:
 	game.press()
 	game.step(1.0 / 120.0)
 	check(is_equal_approx(inner_before - game.walls[0].radius, T.DROP_SPEED / 120.0), "one press accelerates the active ring")
-	check(is_equal_approx(outer_before - game.walls[1].radius, game.speed() / 120.0), "outer ring keeps normal speed")
+	check(is_equal_approx(outer_before - game.walls[1].radius, game.shrink_speed / 120.0), "outer ring keeps normal speed")
 	game.step(0.13)
 	check(game.score == 1 and not game.boosting, "one press carries through contact and consumes the boost")
 	inner_before = game.walls[0].radius
 	game.step(0.1)
-	check(is_equal_approx(inner_before - game.walls[0].radius, game.speed() * 0.1), "the next ring starts at normal speed")
+	check(is_equal_approx(inner_before - game.walls[0].radius, game.shrink_speed * 0.1), "the next ring starts at normal speed")
+	game.walls[0].angle = game.tip_angle + T.WHEEL_STEP
+	game.step(5.0)
+	check(game.state == Model.State.PLAYING, "an early drop leaves about five seconds to aim at the next gap")
+	game.step(0.5)
+	check(game.state == Model.State.OVER and game.score == 1, "the second layer brings back the pressure after the opening")
 	game.reset(7)
 	game.rotate(1)
 	game.press()
@@ -44,10 +49,12 @@ func _initialize() -> void:
 	check(game.walls[0].radius == inner_before and not game.boosting, "pause freezes rings and clears boost")
 	game.press()
 	check(not game.paused and not game.boosting, "resume does not boost")
-	game.step(1.8)
+	game.step(13.3)
 	check(game.score == 1 and game.cleared.size() == 1 and game.state == Model.State.PLAYING, "aligned contact clears a ring without pressing")
 	game.reset(7)
-	game.step(8)
+	game.step(13.0)
+	check(game.state == Model.State.PLAYING, "the opening gives about thirteen seconds like the dot version")
+	game.step(0.3)
 	check(game.score == 0 and game.state == Model.State.OVER, "solid contact ends the run without points")
 	game.press()
 	check(game.score == 0 and game.state == Model.State.PLAYING and game.tip_angle == T.TIP_ANGLE and not game.boosting, "restart restores the initial position and speed")
@@ -84,7 +91,7 @@ func _initialize() -> void:
 			if boosted:
 				game.step(T.TURN_DURATION)
 				game.press()
-			for frame in range(1200):
+			for frame in range(1800):
 				game.step(1.0 / 30.0 if boosted else 1.0 / 120.0)
 				if game.score != layer or game.state == Model.State.OVER:
 					break

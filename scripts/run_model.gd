@@ -10,6 +10,7 @@ var boosting := false
 var walls: Array[Dictionary] = []
 var cleared: Array[Dictionary] = []
 var score := 0
+var shrink_speed := 0.0
 var rng := RandomNumberGenerator.new()
 var tip_angle := T.TIP_ANGLE
 var turn_from := T.TIP_ANGLE
@@ -36,6 +37,7 @@ func reset(seed_value: int = 0) -> void:
 		_append_wall(T.INITIAL_RADIUS + i * T.WALL_SPACING)
 	# One downward notch aligns the opening on the first ring.
 	walls[0].angle = T.TIP_ANGLE + T.WHEEL_STEP
+	_set_layer_pace()
 
 func _append_wall(radius: float) -> void:
 	var gap_angle := T.TIP_ANGLE + rng.randi_range(0, 5) * T.WHEEL_STEP
@@ -56,8 +58,15 @@ func rotate(direction: float) -> void:
 	turn_target += direction * T.WHEEL_STEP
 	turn_elapsed = 0.0
 
-func speed() -> float:
-	return minf(T.INITIAL_SPEED + score * 0.65, T.MAX_SPEED)
+func _set_layer_pace() -> void:
+	# Match the dot version's aiming windows. Calculate the rate once per
+	# layer so an early drop still leaves time to aim at the next opening.
+	var aim_time := T.OPENING_TIME
+	if score > 0:
+		aim_time = maxf(T.MIN_LAYER_TIME, 0.60 + 4.75 / pow(score, 0.82))
+	var wall := walls[0]
+	var contact_radius := G.tip_contact_radius(wall.angle, wall.angle)
+	shrink_speed = (wall.radius - contact_radius) / aim_time
 
 func _turn_angle(seconds: float) -> float:
 	var progress := minf(seconds / T.TURN_DURATION, 1.0)
@@ -71,8 +80,7 @@ func step(dt: float) -> void:
 		remaining -= part
 
 func _tick(dt: float) -> void:
-	var base_speed := speed()
-	var active_speed := T.DROP_SPEED if boosting else base_speed
+	var active_speed := T.DROP_SPEED if boosting else shrink_speed
 	var wall := walls[0]
 	var hit := _contact_time(wall.radius, wall.angle, active_speed, dt)
 	var failed := hit >= 0.0 and not G.gap_accepts_tip(_turn_angle(turn_elapsed + hit), wall.angle)
@@ -85,7 +93,7 @@ func _tick(dt: float) -> void:
 		turn_target = tip_angle
 
 	for i in range(1, walls.size()):
-		walls[i].radius -= base_speed * elapsed
+		walls[i].radius -= shrink_speed * elapsed
 	wall.radius -= active_speed * (hit if hit >= 0.0 else dt)
 	if failed:
 		state = State.OVER
@@ -99,6 +107,8 @@ func _tick(dt: float) -> void:
 	# rings keep drifting inward while the accelerated ring opens up room.
 	if walls.is_empty() or (walls.size() < T.WALL_COUNT and walls[-1].radius <= T.OUTER_RADIUS - T.WALL_SPACING):
 		_append_wall(T.OUTER_RADIUS)
+	if hit >= 0.0:
+		_set_layer_pace()
 
 func _contact_time(radius: float, gap_angle: float, active_speed: float, dt: float) -> float:
 	# Bound how quickly the distance can close as the tip rotates and the wall

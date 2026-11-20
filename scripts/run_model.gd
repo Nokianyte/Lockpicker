@@ -2,23 +2,19 @@ extends RefCounted
 
 const T = preload("res://scripts/tuning.gd")
 const G = preload("res://scripts/wall_geometry.gd")
-enum State { TITLE, READY, LAUNCHING, BOUNCING, OVER }
+
+enum State { TITLE, PLAYING, OVER }
 var state := State.TITLE
 var paused := false
-var walls: Array = []
-var dot := Vector2.ZERO
-var launch_origin := Vector2.ZERO
+var boosting := false
+var walls: Array[Dictionary] = []
+var cleared: Array[Dictionary] = []
 var score := 0
 var rng := RandomNumberGenerator.new()
-var cleared: Array = []
-var bounce_count := 0
-var elapsed := 0.0
-var space_scale := 1.0
-var turning := false
-var turn_from := 0.0
-var turn_target := 0.0
-var turn_elapsed := 0.0
-var buffered_launch := false
+var tip_angle := T.TIP_ANGLE
+var turn_from := T.TIP_ANGLE
+var turn_target := T.TIP_ANGLE
+var turn_elapsed := T.TURN_DURATION
 
 func _init() -> void:
 	reset(42)
@@ -28,130 +24,101 @@ func reset(seed_value: int = 0) -> void:
 	rng.seed = seed_value if seed_value != 0 else Time.get_ticks_usec()
 	walls.clear()
 	cleared.clear()
-	dot = Vector2.ZERO
 	score = 0
-	bounce_count = 0
-	elapsed = 0.0
-	space_scale = 1.0
-	turning = false
-	buffered_launch = false
-	turn_elapsed = 0.0
 	paused = false
-	state = State.READY
+	boosting = false
+	tip_angle = T.TIP_ANGLE
+	turn_from = tip_angle
+	turn_target = tip_angle
+	turn_elapsed = T.TURN_DURATION
+	state = State.PLAYING
 	for i in range(T.WALL_COUNT):
-		append_wall()
-	# A gentle first alignment teaches the wheel without an automatic free clear.
-	walls[0].angle = -PI / 2.0 + T.WHEEL_STEP
+		_append_wall(T.INITIAL_RADIUS + i * T.WALL_SPACING)
+	# One downward notch aligns the opening on the first ring.
+	walls[0].angle = T.TIP_ANGLE + T.WHEEL_STEP
 
-func append_wall() -> void:
-	var radius: float = T.INITIAL_RADIUS
-	if not walls.is_empty():
-		var last: float = walls[-1].radius
-		radius = maxf(last + T.WALL_SPACING, last * 1.25 + 32.0)
-	# Every generated gap must be reachable using whole-side wheel steps.
-	walls.append({"radius": radius, "angle": wrapf(-PI / 2.0 + rng.randi_range(0, 5) * T.WHEEL_STEP, -PI, PI)})
+func _append_wall(radius: float) -> void:
+	var gap_angle := T.TIP_ANGLE + rng.randi_range(0, 5) * T.WHEEL_STEP
+	walls.append({"radius": radius, "angle": wrapf(gap_angle, -PI, PI)})
 
 func press() -> void:
 	if paused:
 		paused = false
-		return
-	if state == State.TITLE or state == State.OVER:
+	elif state == State.TITLE or state == State.OVER:
 		reset()
-	elif state == State.READY:
-		if turning:
-			buffered_launch = true
-		else:
-			_begin_launch()
+	else:
+		boosting = true
 
-func _begin_launch() -> void:
-	buffered_launch = false
-	launch_origin = dot
-	state = State.LAUNCHING
+func release() -> void:
+	boosting = false
 
 func rotate(direction: float) -> void:
-	if state == State.READY and not paused and not buffered_launch:
-		if not turning:
-			turn_target = walls[0].angle
-		turn_from = walls[0].angle
-		turn_target += direction * T.WHEEL_STEP
-		turn_elapsed = 0.0
-		turning = true
+	if state != State.PLAYING or paused:
+		return
+	turn_from = tip_angle
+	turn_target += direction * T.WHEEL_STEP
+	turn_elapsed = 0.0
 
 func speed() -> float:
 	return minf(T.INITIAL_SPEED + score * 0.65, T.MAX_SPEED)
 
+func _turn_angle(seconds: float) -> float:
+	var progress := minf(seconds / T.TURN_DURATION, 1.0)
+	return lerpf(turn_from, turn_target, smoothstep(0.0, 1.0, progress))
+
 func step(dt: float) -> void:
-	# Bound simulation steps even when called directly by tests or after a slow frame.
 	var remaining := dt
-	while remaining > 0.000001:
+	while remaining > 0.000001 and state == State.PLAYING and not paused:
 		var part := minf(remaining, 1.0 / 120.0)
 		_tick(part)
 		remaining -= part
 
 func _tick(dt: float) -> void:
-	if paused or state == State.TITLE or state == State.OVER:
-		return
-	elapsed += dt
-	var wall: Dictionary = walls[0]
-	var old_radius: float = wall.radius
-	var old_angle: float = wall.angle
-	if turning:
-		turn_elapsed = minf(turn_elapsed + dt, T.TURN_DURATION)
-		var progress := turn_elapsed / T.TURN_DURATION
-		var eased := progress * progress * (3.0 - 2.0 * progress)
-		wall.angle = lerpf(turn_from, turn_target, eased)
-		if turn_elapsed >= T.TURN_DURATION:
-			wall.angle = wrapf(turn_target, -PI, PI)
-			turning = false
-	for entry in walls:
-		entry.radius = maxf(0.0, entry.radius - speed() * dt)
-	var previous := dot
-	if state == State.LAUNCHING:
-		dot.y -= T.LAUNCH_SPEED * dt
-	elif state == State.BOUNCING:
-		dot = dot.move_toward(launch_origin, T.BOUNCE_SPEED * dt)
-	var clearance := T.DOT_RADIUS + T.WALL_WIDTH / 2.0
-	var hit := G.swept_hit(previous, dot, old_radius, wall.radius, wall.angle, clearance, old_angle)
-	if hit >= 0.0:
-		if state == State.LAUNCHING:
-			dot = previous.lerp(dot, maxf(0.0, hit - 0.001))
-			# The collision is at a fraction of the tick, but walls are already at
-			# their end-of-tick radii. Account for that remaining wall travel so
-			# recovery starts separated rather than falsely crushed next tick.
-			dot.y += (old_radius - wall.radius) * (1.0 - hit) + 0.05
-			state = State.BOUNCING
-			bounce_count += 1
-		else:
-			state = State.OVER
-		return
-	# A collapsed ring crushes even if its gap happens to face the dot.
-	if wall.radius <= clearance:
+	var base_speed := speed()
+	var active_speed := base_speed * (T.BOOST_MULTIPLIER if boosting else 1.0)
+	var wall := walls[0]
+	var hit := _contact_time(wall.radius, wall.angle, active_speed, dt)
+	var failed := hit >= 0.0 and not G.gap_accepts_tip(_turn_angle(turn_elapsed + hit), wall.angle)
+	var elapsed := hit if failed else dt
+	turn_elapsed = minf(turn_elapsed + elapsed, T.TURN_DURATION)
+	tip_angle = _turn_angle(turn_elapsed)
+	if turn_elapsed >= T.TURN_DURATION:
+		tip_angle = wrapf(tip_angle, -PI, PI)
+		turn_from = tip_angle
+		turn_target = tip_angle
+
+	for i in range(1, walls.size()):
+		walls[i].radius -= base_speed * elapsed
+	wall.radius -= active_speed * (hit if hit >= 0.0 else dt)
+	if failed:
 		state = State.OVER
+		boosting = false
 		return
-	if state == State.LAUNCHING:
-		var boundary: float = -G.point(wall.radius, wall.angle, -PI / 2.0).y
-		if -dot.y > boundary + clearance + 2.0:
-			cleared.append({"radius": wall.radius, "angle": wall.angle})
-			walls.pop_front()
-			score += 1
-			state = State.READY
-			append_wall()
-			# Rebase the coordinate scale to prevent unbounded radii and float drift.
-			# Relative positions and the common polygon center are preserved.
-			var factor: float = T.INITIAL_RADIUS / walls[0].radius
-			for entry in walls:
-				entry.radius *= factor
-			for entry in cleared:
-				entry.radius *= factor
-			dot *= factor
-			launch_origin *= factor
-			space_scale *= factor
-	elif state == State.BOUNCING and dot.distance_to(launch_origin) < 0.01:
-		state = State.READY
-	if state == State.READY and not turning and buffered_launch:
-		_begin_launch()
+	if hit >= 0.0:
+		cleared.append(walls.pop_front())
+		score += 1
+	# Refill from a fixed outer radius when there's enough space. Existing
+	# rings keep drifting inward while the accelerated ring opens up room.
+	if walls.is_empty() or (walls.size() < T.WALL_COUNT and walls[-1].radius <= T.OUTER_RADIUS - T.WALL_SPACING):
+		_append_wall(T.OUTER_RADIUS)
+
+func _contact_time(radius: float, gap_angle: float, active_speed: float, dt: float) -> float:
+	# Bound how quickly the distance can close as the tip rotates and the wall
+	# shrinks. Advance only that far so a fast turn can't skip first contact.
+	var max_angular_speed := 0.0
+	if turn_elapsed < T.TURN_DURATION:
+		max_angular_speed = 1.5 * absf(turn_target - turn_from) / T.TURN_DURATION
+	var closing_speed := active_speed + T.TIP_LENGTH * max_angular_speed / cos(PI / 6.0)
+	var time := 0.0
+	while time <= dt:
+		var angle := _turn_angle(turn_elapsed + time)
+		var distance := radius - active_speed * time - G.tip_contact_radius(angle, gap_angle)
+		if distance <= 0.001:
+			return time
+		time += maxf(distance / closing_speed, 0.0000001)
+	return -1.0
 
 func pause() -> void:
-	if state != State.TITLE and state != State.OVER:
+	if state == State.PLAYING:
 		paused = true
-		buffered_launch = false
+		boosting = false

@@ -27,7 +27,7 @@
 
 - [x] 5.1 Add meaningful deterministic checks for clear versus edge collision, bounce versus crush, one-score-per-wall, repeated press handling, and restart reset.
 - [x] 5.2 Check collision behavior at varied frame rates and late launches; run extended seeded progression checks for nesting, traversable gaps, and safe landing spacing.
-- [ ] 5.3 Playtest a served web export in Chrome, Edge, and Firefox, covering physical wheel controls, resizing, focus pause, bounce pressure, breaking, game over, and restart; record results.
+- [ ] 5.3 Playtest a served web export in Chrome, Edge, and Firefox, covering physical wheel controls, resizing, focus pause, contact, breaking, game over, and restart. Record results.
 - [x] 5.4 Tune wheel sensitivity, shrink progression, bounce duration, and camera framing for readable, responsive play.
 
 ## 6. GitHub publication
@@ -42,3 +42,9 @@
 - [x] 7.1 Animate whole-side turns with consistent collision geometry and preserve rapid wheel inputs.
 - [x] 7.2 Smoothly recenter the dot on screen after dashes and bounces without teleporting its gameplay position.
 - [x] 7.3 Verify turning, buffered launch, and screen centering; publish the updated browser build.
+
+## 8. Center polygon refinement
+
+- [x] 8.1 Replace the moving dot with a fixed center polygon that turns smoothly in whole-side steps.
+- [x] 8.2 Resolve gap or solid contact at the tip and accelerate only the innermost layer while the wheel is held.
+- [ ] 8.3 Verify the new controls and contact behavior in the browser and publish the update.

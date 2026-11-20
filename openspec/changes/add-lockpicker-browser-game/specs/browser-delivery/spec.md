@@ -9,14 +9,14 @@ The delivered game SHALL run from a browser URL without a local installation on 
 
 #### Scenario: First visit
 - **WHEN** a player opens the published URL in a supported browser
-- **THEN** the game loads and presents instructions to scroll to rotate and press the wheel to launch
+- **THEN** the game loads and explains how to rotate the center polygon and hold the wheel to speed up the inner layer
 
 #### Scenario: Resize
 - **WHEN** the player resizes the browser window
 - **THEN** the arena maintains its proportions and essential controls and score remain visible
 
 ### Requirement: Browser input ownership
-Wheel input over the active game SHALL control the game without page scrolling or middle-button autoscroll. Losing focus SHALL pause gameplay; returning SHALL require an explicit middle-button resume action that does not also launch the dot.
+Wheel input over the active game SHALL control the game without page scrolling or middle-button autoscroll. Losing focus SHALL pause gameplay and cancel any active speed boost. Returning SHALL require an explicit middle-button resume action, followed by a fresh press to boost.
 
 #### Scenario: Wheel interaction
 - **WHEN** a player scrolls or middle-clicks over the active game

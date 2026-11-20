@@ -1,13 +1,12 @@
 ## Why
 
-Lockpicker turns a simple mouse-wheel interaction into a tense browser arcade game: align a gap and escape before shrinking polygon walls crush the dot. This change establishes the first playable Godot version and a shareable GitHub-hosted browser build.
+Lockpicker is a browser arcade game about aligning a sharp, rotating center piece with gaps in shrinking polygon walls.
 
 ## What Changes
 
-- Display a dot inside multiple nested polygon walls, each with a gap.
-- Scroll to rotate the innermost remaining polygon; press the scroll wheel to launch the dot outward.
-- Break and remove a wall after a successful crossing. Bounce back after striking solid wall, losing time while the layers continue shrinking.
-- End the run when a shrinking wall crushes the dot.
+- Display a pointed polygon at the center of nested walls with visible gaps.
+- Scroll to turn the center piece one side per notch, and hold the wheel to accelerate the inner layer.
+- Break the inner layer when its gap reaches the tip. End the run on solid contact.
 - Provide endless play, layers-cleared scoring, gradual increases in shrink speed, and quick restart.
 - Use simple geometric visuals inspired by the supplied sketch, with brief breaking feedback.
 - Build the game in Godot, publish source to GitHub, and deliver a playable browser build through GitHub Pages.
@@ -15,7 +14,7 @@ Lockpicker turns a simple mouse-wheel interaction into a tense browser arcade ga
 ## Capabilities
 
 ### New Capabilities
-- `arcade-gameplay`: Wheel controls, shrinking polygon walls, dot movement, crossing, bounce, crushing, scoring, and restart.
+- `arcade-gameplay`: Center polygon rotation, shrinking walls, hold to accelerate, contact outcomes, scoring, and restart.
 - `browser-delivery`: Browser input and presentation, reproducible Godot web export, GitHub source publication, and playable hosting.
 
 ### Modified Capabilities

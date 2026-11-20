@@ -1,5 +1,12 @@
 # Verification
 
+## Center polygon and layer boost
+
+- Godot 4.7.2 starts and exports the updated game successfully. All 620 deterministic checks pass, including fixed ring angles, boost isolation and release, contact during a turn, pause and restart, and 100 consecutive clears at both normal and boosted speed.
+- The browser smoke test exercises a 60-degree turn, a clear while holding the middle button, score preservation after pausing, a miss, restart, and resizing.
+
+Earlier verification entries below describe the previous dash and bounce mechanic.
+
 ## Smooth turns and centering — 2026-11-20
 
 - Turns now ease over 160 ms while preserving one 60-degree side per notch. Collision follows the animated angle; rapid inputs and reversals preserve their requested side count.

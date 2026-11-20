@@ -14,119 +14,74 @@ func check(condition: bool, message: String) -> void:
 
 func _initialize() -> void:
 	var game = Model.new()
+	game.press()
+	check(game.state == Model.State.PLAYING and not game.boosting, "start click does not boost")
 	game.reset(7)
-	var initial_angle: float = game.walls[0].angle
-	var outer_angle: float = game.walls[1].angle
+	var initial_gap: float = game.walls[0].angle
 	game.rotate(1)
-	check(is_equal_approx(game.walls[0].angle, initial_angle), "scroll starts a turn without snapping")
 	game.step(T.TURN_DURATION / 2.0)
-	check(angle_difference(initial_angle, game.walls[0].angle) > 0.0 and angle_difference(initial_angle, game.walls[0].angle) < PI / 3.0, "turn has an intermediate angle")
+	check(is_equal_approx(game.tip_angle, T.TIP_ANGLE + T.WHEEL_STEP / 2.0), "tip animates between sides")
 	game.step(T.TURN_DURATION)
-	check(is_equal_approx(angle_difference(initial_angle, game.walls[0].angle), PI / 3.0), "one notch advances one hexagon side")
-	game.rotate(-1)
-	game.step(T.TURN_DURATION + 0.01)
-	check(is_equal_approx(game.walls[0].angle, initial_angle), "opposite notch reverses one side")
-	check(game.walls[1].angle == outer_angle, "wheel leaves outer walls unchanged")
-	game.rotate(-1)
-	game.press()
-	game.press()
-	check(game.buffered_launch and game.state == Model.State.READY, "click during a turn waits for alignment")
-	for i in range(100):
-		game.step(1.0 / 120.0)
-		if game.score > 0:
-			break
-	check(game.score == 1, "aligned launch clears exactly one wall")
-	check(game.state == Model.State.READY, "crossing returns control")
-	check(game.cleared.size() == 1 and game.walls.size() == T.WALL_COUNT, "one break event and replenishment")
-	check(game.dot.y < 0, "dot physically moved outward")
-	game.reset(7)
-	game.walls[0].angle = 0.0
-	game.press()
-	var initial: float = game.walls[0].radius
-	for i in range(120):
-		game.step(1.0 / 120.0)
-	check(game.bounce_count == 1 and game.score == 0, "solid hit bounces without scoring")
-	check(game.state == Model.State.READY and game.dot.is_equal_approx(Vector2.ZERO), "bounce returns to origin")
-	check(game.walls[0].radius < initial, "shrinking continues during bounce")
-	for phase in range(40):
-		var phased = Model.new()
-		phased.reset(7)
-		phased.step(phase * 0.01)
-		phased.press()
-		phased.step(1.0)
-		check(phased.state == Model.State.READY and phased.bounce_count == 1, "early bounce survives different impact timing %d" % phase)
-	game.pause()
-	var frozen: float = game.walls[0].radius
-	game.step(5)
-	check(game.walls[0].radius == frozen, "pause freezes pressure")
-	game.press()
-	check(not game.paused and game.state == Model.State.READY, "resume does not launch")
-	game.step(20)
-	check(game.state == Model.State.OVER, "waiting ends in crush")
-	game.press()
-	check(game.score == 0 and game.state == Model.State.READY and game.dot == Vector2.ZERO, "restart resets run")
-	game.state = Model.State.BOUNCING
-	game.dot = Vector2(0, -100)
-	game.launch_origin = game.dot
-	game.walls[0].radius = 101.0
-	game.walls[0].angle = 0.0
-	game.step(0.01)
-	check(game.state == Model.State.OVER, "bounce is not immune to crushing")
-	var endpoint: Vector2 = G.point(180.0, -PI / 2.0, -PI / 2.0 + T.GAP_ANGLE / 2.0)
-	check(G.swept_hit(endpoint + Vector2(0, 40), endpoint - Vector2(0, 40), 180, 180, -PI / 2, 7.5) >= 0, "gap endpoint is solid")
-	check(G.swept_hit(Vector2.ZERO, Vector2(0, -300), 180, 175, 0, 7.5) >= 0, "fast launch cannot tunnel through wall")
-	check(G.swept_hit(Vector2.ZERO, Vector2(0, -300), 180, 175, -PI / 2, 7.5) < 0, "aligned swept path remains open")
-	check(G.swept_hit(Vector2(0, -165), Vector2(0, -165), 180, 180, PI / 3, 6, 0) >= 0, "rotating corner cannot tunnel through a resting dot")
-	game.reset(33)
-	initial_angle = game.walls[0].angle
-	for i in range(3):
-		game.rotate(1)
-	game.step(0.04)
-	game.rotate(-1)
-	game.step(0.2)
-	check(absf(angle_difference(game.walls[0].angle, initial_angle + 2 * PI / 3)) < 0.0001, "rapid notches and reversal preserve intended side count")
-	game.rotate(-1)
-	game.press()
-	game.pause()
-	var paused_angle: float = game.walls[0].angle
-	game.step(1)
-	check(game.walls[0].angle == paused_angle, "pause freezes rotation")
-	game.press()
-	game.step(0.2)
-	check(game.state == Model.State.READY and not game.buffered_launch, "resume does not fire a stale buffered launch")
-	for fps in [30, 60, 120, 240]:
-		game.reset(8)
-		game.walls[0].angle = -PI / 2
-		game.press()
-		for i in range(fps):
-			game.step(1.0 / fps)
-		check(game.score == 1 and game.state == Model.State.READY, "consistent launch at %s FPS" % fps)
-	game.reset(21)
-	game.walls[0].angle = -PI / 2
-	game.walls[0].radius = 16.0
+	check(is_equal_approx(game.tip_angle, initial_gap), "one step aims at the adjacent opening")
+	check(game.walls[0].angle == initial_gap, "wheel keeps ring orientation fixed")
+	var inner_before: float = game.walls[0].radius
+	var outer_before: float = game.walls[1].radius
 	game.press()
 	game.step(0.1)
-	check(game.score == 0, "late launch through a gap narrower than the dot cannot score")
-	# Long seeded progression exposes spacing, numeric, and generation failures.
-	game.reset(12)
-	for layer in range(100):
-		var aligned := false
-		for notch in range(6):
-			if absf(angle_difference(game.walls[0].angle, -PI / 2)) < 0.0001:
-				aligned = true
+	check(is_equal_approx(inner_before - game.walls[0].radius, game.speed() * T.BOOST_MULTIPLIER * 0.1), "hold accelerates the active ring")
+	check(is_equal_approx(outer_before - game.walls[1].radius, game.speed() * 0.1), "outer ring keeps normal speed")
+	game.release()
+	inner_before = game.walls[0].radius
+	game.step(0.1)
+	check(is_equal_approx(inner_before - game.walls[0].radius, game.speed() * 0.1), "release restores normal speed")
+	game.press()
+	game.pause()
+	inner_before = game.walls[0].radius
+	game.step(1)
+	check(game.walls[0].radius == inner_before and not game.boosting, "pause freezes rings and clears boost")
+	game.press()
+	check(not game.paused and not game.boosting, "resume does not boost")
+	game.step(5)
+	check(game.score == 1 and game.cleared.size() == 1 and game.state == Model.State.PLAYING, "aligned contact clears a ring without pressing")
+	game.reset(7)
+	game.step(8)
+	check(game.score == 0 and game.state == Model.State.OVER, "solid contact ends the run without points")
+	game.press()
+	check(game.score == 0 and game.state == Model.State.PLAYING and game.tip_angle == T.TIP_ANGLE and not game.boosting, "restart restores the initial position and speed")
+	check(not G.gap_accepts_tip(T.TIP_ANGLE + T.GAP_ANGLE / 2.0, T.TIP_ANGLE), "gap edge does not clear")
+
+	# The turn must be sampled when contact happens, even mid-animation.
+	game.reset(7)
+	game.walls[0].radius = G.tip_contact_radius(game.tip_angle, initial_gap) + 0.02
+	game.rotate(1)
+	game.press()
+	game.step(0.5)
+	check(game.state == Model.State.OVER and game.score == 0, "a late turn cannot retroactively clear a ring")
+	game.reset(7)
+	game.walls[0].angle = T.TIP_ANGLE + T.WHEEL_STEP
+	game.walls[0].radius = T.TIP_LENGTH / cos(PI / 6.0) - 0.2
+	game.rotate(1)
+	game.step(0.01)
+	check(game.state == Model.State.OVER, "contact at start of tick resolves before rotation moves away")
+
+	for boosted in [false, true]:
+		game.reset(17)
+		if boosted:
+			game.press()
+		for layer in range(100):
+			var angle_delta: float = angle_difference(game.tip_angle, game.walls[0].angle)
+			var notches := roundi(angle_delta / T.WHEEL_STEP)
+			for i in range(absi(notches)):
+				game.rotate(signf(notches))
+			for frame in range(1200):
+				game.step(1.0 / 30.0 if boosted else 1.0 / 120.0)
+				if game.score != layer or game.state == Model.State.OVER:
+					break
+			check(game.score == layer + 1, "seeded ring %d is reachable (boosted: %s)" % [layer, boosted])
+			if game.score != layer + 1:
 				break
-			game.rotate(1)
-			game.step(T.TURN_DURATION + 0.01)
-		check(aligned, "generated gap is reachable in whole-side steps")
-		game.press()
-		for frame in range(10000):
-			game.step(1.0 / 60)
-			if game.state != Model.State.LAUNCHING:
-				break
-		check(game.score == layer + 1, "seeded layer %d is reachable" % layer)
-		if game.state == Model.State.OVER or game.score != layer + 1:
-			break
-		for j in range(1, game.walls.size()):
-			check(game.walls[j].radius * cos(PI / 6) > game.walls[j - 1].radius + 12, "nested walls remain separated")
+			check(not game.walls.is_empty() and game.walls[-1].radius <= T.OUTER_RADIUS, "refill is bounded")
+			for j in range(1, game.walls.size()):
+				check(game.walls[j].radius - game.walls[j - 1].radius >= T.WALL_SPACING - 0.01, "rings remain separated")
 	print("RESULT: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)

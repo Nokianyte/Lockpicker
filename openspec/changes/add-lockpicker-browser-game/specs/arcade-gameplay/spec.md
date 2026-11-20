@@ -1,75 +1,45 @@
 ## Purpose
 
-Provide an endless arcade challenge in which a player aligns shrinking polygon gaps and launches a dot through them using only the mouse wheel.
+Provide an endless arcade challenge in which a player aligns the sharp tip of a centered polygon with gaps in shrinking walls using only the mouse wheel.
 
 ## ADDED Requirements
 
-### Requirement: Nested shrinking arena
-The game SHALL display a dot inside multiple nested polygon walls with visible gaps. All remaining walls SHALL continuously shrink during active play, including launch, bounce, and breaking animations.
+### Requirement: Fixed center and shrinking layers
+The game SHALL display a pointed polygon centered in multiple nested hexagonal layers, each with a visible gap. The center polygon SHALL stay at the viewport center, and the layers SHALL retain their orientation as they shrink.
 
-#### Scenario: Time passes without input
-- **WHEN** the player waits during a run
-- **THEN** the remaining walls move inward and reduce the available escape time
+#### Scenario: No input
+- **WHEN** the player waits during an active run
+- **THEN** the layers move inward until the inner layer reaches the tip
 
-### Requirement: Wheel rotation and launch
-Each scroll-wheel notch SHALL rotate the innermost remaining polygon by exactly one side (60 degrees for a hexagon). Opposite scroll directions SHALL rotate in opposite directions without rotating the outer walls. Generated gap orientations SHALL be reachable using these whole-side steps. Pressing the middle mouse button SHALL launch the ready dot along its visibly indicated outward path. Holding the button SHALL NOT repeatedly launch, and additional presses during a launch or bounce SHALL NOT queue attempts.
+### Requirement: Whole-side turns
+Each scroll-wheel notch SHALL smoothly rotate the center polygon by one side (60 degrees). Opposite scroll directions SHALL rotate it in opposite directions. Generated gaps SHALL align with reachable orientations.
 
-#### Scenario: Align and launch
-- **WHEN** the player scrolls while the dot is ready and then presses the wheel
-- **THEN** the nearest polygon rotates and the dot launches along the indicated path
+#### Scenario: Turn toward the next gap
+- **WHEN** the player scrolls during play
+- **THEN** the pointed polygon turns in place and each layer keeps its existing orientation
 
-#### Scenario: Smooth side turns
-- **WHEN** the player scrolls one or several notches
-- **THEN** the polygon animates smoothly to the corresponding whole-side orientation, with matching visible and collision geometry
-- **AND** a middle-button press during the turn launches once after the turn settles
+### Requirement: Wheel hold accelerates the inner layer
+During play, holding the middle mouse button SHALL accelerate the innermost layer while the outer layers continue shrinking at normal speed. Releasing the button SHALL restore normal speed.
 
-#### Scenario: Repeated input during an attempt
-- **WHEN** the player presses or holds the wheel during an unresolved attempt
-- **THEN** no additional launch is started or queued
+#### Scenario: Aligned speed boost
+- **WHEN** the player holds the wheel with the tip aligned
+- **THEN** the approaching layer reaches the tip sooner
+- **AND** if the button stays held, the speed boost applies to the next innermost layer
 
-### Requirement: Successful crossing
-The game SHALL count a crossing only when the entire dot passes through the gap without touching solid wall. It SHALL award exactly one point, briefly break or fade that wall, remove it, and make the next wall the rotation target. A single launch SHALL clear at most one wall.
+### Requirement: Tip contact decides the outcome
+When the innermost layer reaches the sharp tip, its gap MUST be aligned with the tip to score. A successful contact SHALL break and remove the layer, add one point, and expose the next layer. Contact with a solid edge SHALL end the run and show the final score.
 
-#### Scenario: Dot fits through the gap
-- **WHEN** the dot fully crosses the aligned opening
-- **THEN** the crossed wall breaks and disappears, the score increases by one, and the next wall becomes the target
+#### Scenario: Gap meets the tip
+- **WHEN** the shrinking layer reaches the aligned tip
+- **THEN** it breaks and adds one point even if the player has not pressed the wheel
 
-#### Scenario: Gap edge contact
-- **WHEN** the dot's edge hits a solid endpoint of the opening
-- **THEN** the attempt is treated as a wall hit instead of a successful crossing
-
-### Requirement: Failed attempts cost time
-A launch into solid wall SHALL visibly bounce the dot back to its launch position without clearing the wall or awarding points. The player SHALL regain launch control after the bounce, unless crushed first.
-
-#### Scenario: Misaligned launch
-- **WHEN** the launched dot strikes solid wall while there is still room to return
-- **THEN** it bounces back while the walls keep shrinking and the run continues with the same score
-
-### Requirement: Crushing ends the run
-A shrinking wall reaching the resting dot or overtaking it during recovery SHALL end the run. An ordinary outbound launch impact SHALL instead use the bounce behavior. Game over SHALL stop gameplay and show the final layers-cleared score.
-
-#### Scenario: Waiting too long
-- **WHEN** an inward-moving wall reaches the dot before it escapes
-- **THEN** the run ends and displays its final score
-
-#### Scenario: Crushed during bounce
-- **WHEN** a shrinking wall overtakes the returning dot
-- **THEN** the run ends instead of granting immunity until the bounce finishes
-
-### Requirement: Camera recenters after movement
-The camera SHALL smoothly bring the dot back to the center of the screen after a successful dash or a completed bounce, without changing its gameplay position or wall spacing.
-
-#### Scenario: Dash or bounce finishes
-- **WHEN** the dot completes its movement and remains at rest
-- **THEN** its screen position settles at the viewport center while the walls continue shrinking
+#### Scenario: Edge meets the tip
+- **WHEN** the layer reaches the tip while the tip is aimed at the solid wall or a gap edge
+- **THEN** the run ends without awarding a point for that layer
 
 ### Requirement: Endless progression and restart
-The game SHALL replenish outer walls for endless play, gradually increase shrink speed with layers cleared, and retain traversable gaps and room for the next attempt. Pressing the wheel from the start or game-over screen SHALL start a fresh run at zero score and initial difficulty without also launching the dot.
-
-#### Scenario: Continued successful play
-- **WHEN** the player clears successive walls
-- **THEN** new outer walls maintain the challenge and shrink speed increases within the configured playable limits
+The game SHALL replenish outer layers and increase normal shrink speed with score up to a playable limit. Clicking the wheel from the start or game-over screen SHALL start a fresh run at zero score and initial difficulty. Starting, restarting, and resuming SHALL require a fresh press to activate the boost.
 
 #### Scenario: Restart
 - **WHEN** the player presses the wheel after game over
-- **THEN** a fresh arena appears with zero score, reset difficulty, and a ready dot
+- **THEN** the layers reset and the tip points up at the start of a fresh run

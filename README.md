@@ -1,15 +1,15 @@
 # Lockpicker
 
-A mouse-wheel arcade game built in **Godot 4.7.2**. Rotate the shrinking polygon, line up its opening, and launch the dot before the walls close in.
+A mouse-wheel arcade game built in **Godot 4.7.2**. Rotate the center polygon so its sharp tip lines up with the opening in the shrinking inner layer.
 
 **[Play in your browser](https://nokianyte.github.io/Lockpicker/)** · [Source on GitHub](https://github.com/Nokianyte/Lockpicker)
 
 ## Controls
 
-- **Scroll:** rotate the nearest polygon by one full side (60°) per notch.
-- Turns animate smoothly; clicking during a turn launches as soon as it finishes. The dot smoothly returns to screen center after each dash or bounce.
-- **Press the scroll wheel:** start, launch, resume, or restart.
-- A missed launch bounces back and costs time. A successful escape breaks the wall and earns one point.
+- **Scroll:** turn the center polygon by one side (60°) per notch. Scroll down one notch to line up the first layer.
+- **Hold the scroll wheel:** speed up the inner layer during play. Release to return it to normal speed.
+- An aligned layer breaks when it reaches the tip and earns one point. A solid edge hitting the tip ends the run.
+- **Press the scroll wheel:** start, restart, or resume from the corresponding screen.
 - The game pauses when focus is lost. Press the wheel to resume.
 
 Endless layers become faster as the score increases. The best score lasts for the current session. Desktop mouse play is required; touch controls are not included.
@@ -29,7 +29,7 @@ godot --headless --path . --editor --import --quit
 godot --headless --path . --script tests/test_game.gd
 ```
 
-The deterministic suite covers full and edge crossings, tunneling, bounce/crush behavior, input-state transitions, pause/restart, frame-rate variation, and 100 consecutive seeded escapes.
+The deterministic suite covers turns, gap and solid contact, boosting only the inner layer, pause and restart, and 100 consecutive layer clears at both normal and boosted speed.
 
 ## Browser export
 

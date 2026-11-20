@@ -47,4 +47,4 @@
 
 - [x] 8.1 Replace the moving dot with a fixed center polygon that turns smoothly in whole-side steps.
 - [x] 8.2 Resolve gap or solid contact at the tip and accelerate only the innermost layer while the wheel is held.
-- [ ] 8.3 Verify the new controls and contact behavior in the browser and publish the update.
+- [x] 8.3 Verify the new controls and contact behavior in the browser and publish the update.

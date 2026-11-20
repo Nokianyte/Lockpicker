@@ -4,6 +4,8 @@
 
 - Godot 4.7.2 starts and exports the updated game successfully. All 620 deterministic checks pass, including fixed ring angles, boost isolation and release, contact during a turn, pause and restart, and 100 consecutive clears at both normal and boosted speed.
 - The browser smoke test exercises a 60-degree turn, a clear while holding the middle button, score preservation after pausing, a miss, restart, and resizing.
+- The smoke test passed locally in Chrome, Edge, and Firefox. Edge passed on an isolated retry after a transient audio-device error in the first headless session.
+- [GitHub Pages deployment 44792995141](https://github.com/Nokianyte/Lockpicker/actions/runs/44792995141) passed. The hosted Chrome smoke test passed with a longer timeout for the cold runtime download.
 
 Earlier verification entries below describe the previous dash and bounce mechanic.
 

@@ -19,8 +19,9 @@ const assert = require('node:assert/strict');
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-    await page.goto(target);
-    await page.locator('#status').waitFor({ state: 'hidden', timeout: 30000 });
+    // A cold hosted load has to fetch the full Godot WebAssembly runtime.
+    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 });
+    await page.locator('#status').waitFor({ state: 'hidden', timeout: 90000 });
     fs.mkdirSync('test-results', { recursive: true });
     const save = label => page.screenshot({ path: `test-results/${engine}-${label}.png` });
     const score = () => page.screenshot({ clip: { x: 915, y: 50, width: 50, height: 30 } });
@@ -47,8 +48,8 @@ const assert = require('node:assert/strict');
     await page.waitForTimeout(200);
     assert.deepEqual(await score(), afterClear, 'resume should preserve the score');
 
-    await page.reload();
-    await page.locator('#status').waitFor({ state: 'hidden', timeout: 30000 });
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 90000 });
+    await page.locator('#status').waitFor({ state: 'hidden', timeout: 90000 });
     await page.mouse.click(550, 400, clearInput);
     await page.mouse.down(clearInput);
     await page.waitForTimeout(2000);

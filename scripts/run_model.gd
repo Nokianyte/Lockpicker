@@ -72,7 +72,7 @@ func step(dt: float) -> void:
 
 func _tick(dt: float) -> void:
 	var base_speed := speed()
-	var active_speed := base_speed * (T.BOOST_MULTIPLIER if boosting else 1.0)
+	var active_speed := T.DROP_SPEED if boosting else base_speed
 	var wall := walls[0]
 	var hit := _contact_time(wall.radius, wall.angle, active_speed, dt)
 	var failed := hit >= 0.0 and not G.gap_accepts_tip(_turn_angle(turn_elapsed + hit), wall.angle)

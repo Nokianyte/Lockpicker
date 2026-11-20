@@ -27,10 +27,10 @@ func _initialize() -> void:
 	var inner_before: float = game.walls[0].radius
 	var outer_before: float = game.walls[1].radius
 	game.press()
-	game.step(0.1)
-	check(is_equal_approx(inner_before - game.walls[0].radius, game.speed() * T.BOOST_MULTIPLIER * 0.1), "one press accelerates the active ring")
-	check(is_equal_approx(outer_before - game.walls[1].radius, game.speed() * 0.1), "outer ring keeps normal speed")
-	game.step(1.3)
+	game.step(1.0 / 120.0)
+	check(is_equal_approx(inner_before - game.walls[0].radius, T.DROP_SPEED / 120.0), "one press accelerates the active ring")
+	check(is_equal_approx(outer_before - game.walls[1].radius, game.speed() / 120.0), "outer ring keeps normal speed")
+	game.step(0.13)
 	check(game.score == 1 and not game.boosting, "one press carries through contact and consumes the boost")
 	inner_before = game.walls[0].radius
 	game.step(0.1)
@@ -44,7 +44,7 @@ func _initialize() -> void:
 	check(game.walls[0].radius == inner_before and not game.boosting, "pause freezes rings and clears boost")
 	game.press()
 	check(not game.paused and not game.boosting, "resume does not boost")
-	game.step(5)
+	game.step(1.8)
 	check(game.score == 1 and game.cleared.size() == 1 and game.state == Model.State.PLAYING, "aligned contact clears a ring without pressing")
 	game.reset(7)
 	game.step(8)
@@ -52,6 +52,13 @@ func _initialize() -> void:
 	game.press()
 	check(game.score == 0 and game.state == Model.State.PLAYING and game.tip_angle == T.TIP_ANGLE and not game.boosting, "restart restores the initial position and speed")
 	check(not G.gap_accepts_tip(T.TIP_ANGLE + T.GAP_ANGLE / 2.0, T.TIP_ANGLE), "gap edge does not clear")
+	game.reset(7)
+	game.walls.resize(1)
+	game.walls[0].angle = T.TIP_ANGLE
+	game.walls[0].radius = T.OUTER_RADIUS
+	game.press()
+	game.step(0.13)
+	check(game.score == 1 and game.cleared.size() == 1, "even the farthest possible aligned drop clears within 130 ms")
 
 	# The turn must be sampled when contact happens, even mid-animation.
 	game.reset(7)
@@ -75,6 +82,7 @@ func _initialize() -> void:
 			for i in range(absi(notches)):
 				game.rotate(signf(notches))
 			if boosted:
+				game.step(T.TURN_DURATION)
 				game.press()
 			for frame in range(1200):
 				game.step(1.0 / 30.0 if boosted else 1.0 / 120.0)

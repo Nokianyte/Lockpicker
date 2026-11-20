@@ -7,7 +7,7 @@ A mouse-wheel arcade game built in **Godot 4.7.2**. Rotate the center polygon so
 ## Controls
 
 - **Scroll:** turn the center polygon by one side (60°) per notch. Scroll down one notch to line up the first layer.
-- **Click the scroll wheel during play:** speed up the current inner layer until it reaches the tip.
+- **Click the scroll wheel during play:** drop the current inner layer to the tip almost instantly.
 - An aligned layer breaks when it reaches the tip and earns one point. A solid edge hitting the tip ends the run.
 - **Press the scroll wheel:** start, restart, or resume from the corresponding screen.
 - The game pauses when focus is lost. Press the wheel to resume.

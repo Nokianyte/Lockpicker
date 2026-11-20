@@ -45,19 +45,17 @@ const assert = require('node:assert/strict');
     const score = () => page.screenshot({ clip: { x: 915, y: 50, width: 50, height: 30 } });
     const core = () => page.screenshot({ clip: { x: 528, y: 329, width: 44, height: 143 } });
     const clearInput = { button: 'middle' };
-    await page.mouse.click(550, 400, clearInput);
-    await page.waitForTimeout(200);
     const zero = await score();
-    const beforeTurn = await core();
+    // Start, turn, and drop in one sequence. Screenshots can stall the browser
+    // long enough to consume most of the first layer's aiming window.
+    await page.mouse.click(550, 400, clearInput);
     await page.mouse.wheel(0, 120);
     await page.waitForTimeout(240);
-    await save('aligned-tip');
-    assert.notDeepEqual(await core(), beforeTurn, 'scroll should rotate the central polygon');
     await page.mouse.click(550, 400, clearInput);
     await page.waitForTimeout(250);
     const afterClear = await score();
-    assert.notDeepEqual(afterClear, zero, 'one click should drop the aligned layer within 250 ms');
     await save('layer-cleared');
+    assert.notDeepEqual(afterClear, zero, 'one turn and a click should clear the layer within 250 ms of the click');
     await canvas.evaluate(element => element.ownerDocument.defaultView.dispatchEvent(new Event('blur')));
     await page.waitForTimeout(150);
     await save('paused-refinement');

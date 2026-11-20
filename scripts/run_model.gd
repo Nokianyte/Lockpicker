@@ -49,9 +49,6 @@ func press() -> void:
 	else:
 		boosting = true
 
-func release() -> void:
-	boosting = false
-
 func rotate(direction: float) -> void:
 	if state != State.PLAYING or paused:
 		return
@@ -95,6 +92,7 @@ func _tick(dt: float) -> void:
 		boosting = false
 		return
 	if hit >= 0.0:
+		boosting = false
 		cleared.append(walls.pop_front())
 		score += 1
 	# Refill from a fixed outer radius when there's enough space. Existing

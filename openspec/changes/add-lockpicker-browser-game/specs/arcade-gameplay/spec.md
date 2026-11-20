@@ -18,13 +18,13 @@ Each scroll-wheel notch SHALL smoothly rotate the center polygon by one side (60
 - **WHEN** the player scrolls during play
 - **THEN** the pointed polygon turns in place and each layer keeps its existing orientation
 
-### Requirement: Wheel hold accelerates the inner layer
-During play, holding the middle mouse button SHALL accelerate the innermost layer while the outer layers continue shrinking at normal speed. Releasing the button SHALL restore normal speed.
+### Requirement: Wheel click accelerates the inner layer
+During play, one middle-button press SHALL accelerate the innermost layer until it contacts the tip while the outer layers continue shrinking at normal speed. Releasing the button SHALL leave the boost active until contact.
 
 #### Scenario: Aligned speed boost
-- **WHEN** the player holds the wheel with the tip aligned
+- **WHEN** the player clicks the wheel with the tip aligned
 - **THEN** the approaching layer reaches the tip sooner
-- **AND** if the button stays held, the speed boost applies to the next innermost layer
+- **AND** the next innermost layer moves at its normal speed until another click
 
 ### Requirement: Tip contact decides the outcome
 When the innermost layer reaches the sharp tip, its gap MUST be aligned with the tip to score. A successful contact SHALL break and remove the layer, add one point, and expose the next layer. Contact with a solid edge SHALL end the run and show the final score.

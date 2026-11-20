@@ -9,7 +9,7 @@ The delivered game SHALL run from a browser URL without a local installation on 
 
 #### Scenario: First visit
 - **WHEN** a player opens the published URL in a supported browser
-- **THEN** the game loads and explains how to rotate the center polygon and hold the wheel to speed up the inner layer
+- **THEN** the game loads and explains how to rotate the center polygon and click the wheel to speed up the inner layer
 
 #### Scenario: Resize
 - **WHEN** the player resizes the browser window

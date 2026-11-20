@@ -28,12 +28,15 @@ func _initialize() -> void:
 	var outer_before: float = game.walls[1].radius
 	game.press()
 	game.step(0.1)
-	check(is_equal_approx(inner_before - game.walls[0].radius, game.speed() * T.BOOST_MULTIPLIER * 0.1), "hold accelerates the active ring")
+	check(is_equal_approx(inner_before - game.walls[0].radius, game.speed() * T.BOOST_MULTIPLIER * 0.1), "one press accelerates the active ring")
 	check(is_equal_approx(outer_before - game.walls[1].radius, game.speed() * 0.1), "outer ring keeps normal speed")
-	game.release()
+	game.step(1.3)
+	check(game.score == 1 and not game.boosting, "one press carries through contact and consumes the boost")
 	inner_before = game.walls[0].radius
 	game.step(0.1)
-	check(is_equal_approx(inner_before - game.walls[0].radius, game.speed() * 0.1), "release restores normal speed")
+	check(is_equal_approx(inner_before - game.walls[0].radius, game.speed() * 0.1), "the next ring starts at normal speed")
+	game.reset(7)
+	game.rotate(1)
 	game.press()
 	game.pause()
 	inner_before = game.walls[0].radius
@@ -66,13 +69,13 @@ func _initialize() -> void:
 
 	for boosted in [false, true]:
 		game.reset(17)
-		if boosted:
-			game.press()
 		for layer in range(100):
 			var angle_delta: float = angle_difference(game.tip_angle, game.walls[0].angle)
 			var notches := roundi(angle_delta / T.WHEEL_STEP)
 			for i in range(absi(notches)):
 				game.rotate(signf(notches))
+			if boosted:
+				game.press()
 			for frame in range(1200):
 				game.step(1.0 / 30.0 if boosted else 1.0 / 120.0)
 				if game.score != layer or game.state == Model.State.OVER:

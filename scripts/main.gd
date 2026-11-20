@@ -39,7 +39,6 @@ func _input(event: InputEvent) -> void:
 				game.press()
 				middle_down = true
 			elif not event.pressed:
-				game.release()
 				middle_down = false
 			get_viewport().set_input_as_handled()
 		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
@@ -133,7 +132,7 @@ func _draw() -> void:
 	draw_rect(Rect2(0, footer_y - 28, size.x, 80), Color("06090f"))
 	draw_line(Vector2(32, footer_y - 28), Vector2(size.x - 32, footer_y - 28), Color("23343e"), 1)
 	text("SCROLL  /  ROTATE TIP", Vector2(34, footer_y), 13, INK)
-	text("HOLD WHEEL  /  SPEED UP INNER LAYER", Vector2(34, footer_y + 22), 13, GOLD if game.boosting else MUTED)
+	text("PRESS WHEEL  /  SPEED UP INNER LAYER", Vector2(34, footer_y + 22), 13, GOLD if game.boosting else MUTED)
 	if game.state == Model.State.PLAYING:
 		var room: float = active.radius - G.tip_contact_radius(game.tip_angle, active.angle)
 		var pressure := clampf(room / (T.INITIAL_RADIUS - T.TIP_LENGTH), 0.0, 1.0)

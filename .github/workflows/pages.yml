@@ -45,9 +45,12 @@ jobs:
           godot --headless --path . --script tests/test_game.gd
       - name: Export
         run: |
-          mkdir -p build/web
+          release_dir="build/web/releases/${GITHUB_SHA}"
+          mkdir -p "$release_dir"
           touch build/.gdignore
-          godot --headless --path . --export-release Web build/web/index.html
+          godot --headless --path . --export-release Web "$release_dir/index.html"
+          cp web/launcher.html build/web/index.html
+          printf '{"version":"%s"}\n' "$GITHUB_SHA" > build/web/release.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

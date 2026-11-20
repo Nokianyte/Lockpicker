@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lockpicker</title>
+  <link rel="icon" href="data:,">
+  <style>
+    body { margin: 0; background: #06090f; color: #e8f3ee; font: 1rem system-ui; }
+    p { margin: 1rem; }
+    iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
+  </style>
+</head>
+<body>
+  <p id="loading" role="status">Loading Lockpicker…</p>
+  <noscript><p>Enable JavaScript to play Lockpicker.</p></noscript>
+  <iframe id="game" title="Lockpicker game" hidden></iframe>
+  <script>
+    async function loadGame() {
+      // Pages can cache static responses at the CDN as well as in the browser.
+      const response = await fetch(`./release.json?time=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Release lookup failed (${response.status})`);
+      const { version } = await response.json();
+      if (!/^[a-f0-9]{40}$/.test(version)) throw new Error('Invalid release version');
+
+      const game = document.querySelector('#game');
+      game.src = `./releases/${version}/index.html`;
+      game.hidden = false;
+      document.querySelector('#loading').hidden = true;
+    }
+
+    loadGame().catch(error => {
+      console.error(error);
+      document.querySelector('#loading').textContent = 'Could not load Lockpicker. Refresh to try again.';
+    });
+  </script>
+</body>
+</html>

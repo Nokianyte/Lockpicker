@@ -19,9 +19,27 @@ const assert = require('node:assert/strict');
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+    async function waitForGame() {
+      await page.locator('#canvas, #game').first().waitFor({ state: 'attached', timeout: 90000 });
+      const screen = await page.locator('#game').count() ? page.frameLocator('#game') : page;
+      const canvas = screen.locator('#canvas');
+      await canvas.waitFor({ state: 'visible', timeout: 90000 });
+      const notice = screen.locator('#status-notice');
+      await Promise.race([
+        screen.locator('#status').waitFor({ state: 'detached', timeout: 90000 }),
+        notice.waitFor({ state: 'visible', timeout: 90000 }).then(async () => {
+          throw new Error(await notice.innerText());
+        }),
+      ]);
+      await canvas.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      return canvas;
+    }
     // A cold hosted load has to fetch the full Godot WebAssembly runtime.
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 });
-    await page.locator('#status').waitFor({ state: 'hidden', timeout: 90000 });
+    const canvas = await waitForGame();
+    if (await page.locator('#game').count()) {
+      assert.match(await page.locator('#game').getAttribute('src'), /^\.\/releases\/[a-f0-9]{40}\/index\.html$/);
+    }
     fs.mkdirSync('test-results', { recursive: true });
     const save = label => page.screenshot({ path: `test-results/${engine}-${label}.png` });
     const score = () => page.screenshot({ clip: { x: 915, y: 50, width: 50, height: 30 } });
@@ -33,14 +51,14 @@ const assert = require('node:assert/strict');
     const beforeTurn = await core();
     await page.mouse.wheel(0, 120);
     await page.waitForTimeout(240);
-    assert.notDeepEqual(await core(), beforeTurn, 'scroll should rotate the central polygon');
     await save('aligned-tip');
+    assert.notDeepEqual(await core(), beforeTurn, 'scroll should rotate the central polygon');
     await page.mouse.click(550, 400, clearInput);
     await page.waitForTimeout(1800);
     const afterClear = await score();
     assert.notDeepEqual(afterClear, zero, 'one click should boost the aligned layer until it clears');
     await save('layer-cleared');
-    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await canvas.evaluate(element => element.ownerDocument.defaultView.dispatchEvent(new Event('blur')));
     await page.waitForTimeout(150);
     await save('paused-refinement');
     await page.mouse.click(550, 400, clearInput);
@@ -48,7 +66,7 @@ const assert = require('node:assert/strict');
     assert.deepEqual(await score(), afterClear, 'resume should preserve the score');
 
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 90000 });
-    await page.locator('#status').waitFor({ state: 'hidden', timeout: 90000 });
+    await waitForGame();
     await page.mouse.click(550, 400, clearInput);
     await page.mouse.click(550, 400, clearInput);
     await page.waitForTimeout(2000);

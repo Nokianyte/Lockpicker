@@ -63,10 +63,10 @@ func _ready() -> void:
 	_editor_screen.hide()
 
 	_file_dialog = FileDialog.new()
-	_file_dialog.title = "Import a WAV song"
+	_file_dialog.title = "Import a song"
 	_file_dialog.access = FileDialog.ACCESS_FILESYSTEM
 	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	_file_dialog.filters = PackedStringArray(["*.wav ; WAV audio"])
+	_file_dialog.filters = PackedStringArray(["*.mp3, *.wav ; MP3 or WAV audio"])
 	_file_dialog.file_selected.connect(func(path: String) -> void: _accept_song(Library.read_song_file(path)))
 	add_child(_file_dialog)
 	_leave_dialog = ConfirmationDialog.new()
@@ -181,7 +181,7 @@ func _build_settings() -> PanelContainer:
 	_song_name.size_flags_horizontal = SIZE_EXPAND_FILL
 	_song_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	song.add_child(_song_name)
-	_import_button = UI.button("Import WAV", _import_song)
+	_import_button = UI.button("Import Audio", _import_song)
 	song.add_child(_import_button)
 	var offset_row := HBoxContainer.new()
 	settings.add_child(offset_row)
@@ -262,7 +262,7 @@ func show_charts() -> void:
 	if result.has("error"):
 		_library_status.text = result.error
 		return
-	_library_status.text = "Create a chart and import a WAV song to start." if result.charts.is_empty() else ""
+	_library_status.text = "Create a chart and import an MP3 or WAV song to start." if result.charts.is_empty() else ""
 	for entry in result.charts:
 		_add_library_row(entry)
 
@@ -282,6 +282,8 @@ func _add_library_row(entry: Dictionary) -> void:
 func _open_saved(id: String, play: bool) -> void:
 	if _busy:
 		return
+	if play:
+		transport.unlock_audio()
 	_busy = true
 	var result: Dictionary = await library.read_chart(id)
 	_busy = false
@@ -349,9 +351,14 @@ func _accept_song(result: Dictionary) -> void:
 	if result.has("error"):
 		_show_status(result.error, true)
 		return
-	var stream := Library.decode_song(result.bytes)
+	_busy = true
+	_refresh_actions()
+	_show_status("Reading audio…")
+	var stream := await library.decode_song(result.bytes, result.name)
+	_busy = false
 	if stream == null:
-		_show_status("Could not open this WAV file.", true)
+		_refresh_actions()
+		_show_status("Could not open this MP3 or WAV file.", true)
 		return
 	chart.audio_id = Chart.new_id()
 	chart.audio_name = result.name

@@ -6,7 +6,12 @@ const WEB_AUDIO := """
 window.lockpickerSongAudio ??= (function () {
 	let context, buffer, songId, source;
 	let started = 0, offset = 0;
+	function unlock() {
+		context ??= new AudioContext();
+		context.resume().catch(() => {});
+	}
 	return {
+		unlock,
 		hasSong(id) {
 			return songId === id;
 		},
@@ -31,7 +36,7 @@ window.lockpickerSongAudio ??= (function () {
 			songId = id;
 		},
 		play(position) {
-			context.resume().catch(() => {});
+			unlock();
 			source = context.createBufferSource();
 			source.buffer = buffer;
 			source.connect(context.destination);
@@ -78,6 +83,10 @@ func duration() -> float:
 func start_at(seconds: float) -> void:
 	seek_to(seconds)
 	resume_song()
+
+func unlock_audio() -> void:
+	if _web != null:
+		_web.unlock()
 
 func resume_song() -> void:
 	if running or stream == null or _position >= duration():

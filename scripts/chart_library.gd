@@ -4,6 +4,9 @@ signal web_finished(result: Array)
 
 const Chart = preload("res://scripts/song_chart.gd")
 const MAX_AUDIO_BYTES := 128 * 1024 * 1024
+const MP3_DECODE_RATE := 44100
+const MP3_FRAMES_PER_PASS := 32768
+const PCM_STEREO_FRAME_BYTES := 4
 const WEB_STORAGE := """
 window.lockpickerChartStorage = (function () {
 	const database = new Promise((resolve, reject) => {
@@ -68,7 +71,7 @@ window.lockpickerChartStorage = (function () {
 		pick(callback, limit) {
 			const input = document.createElement('input');
 			input.type = 'file';
-			input.accept = '.wav,audio/wav,audio/wave';
+			input.accept = '.mp3,.wav,audio/mpeg,audio/wav,audio/wave';
 			input.hidden = true;
 			document.body.appendChild(input);
 			input.addEventListener('cancel', () => {
@@ -79,7 +82,7 @@ window.lockpickerChartStorage = (function () {
 				const file = input.files[0];
 				input.remove();
 				if (!file) return callback('');
-				if (file.size > limit) return callback('Choose a WAV file under 128 MiB.');
+				if (file.size > limit) return callback('Choose an MP3 or WAV file under 128 MiB.');
 				try {
 					callback('', file.name, await file.arrayBuffer());
 				} catch (error) {
@@ -148,8 +151,8 @@ func read_chart(id: String) -> Dictionary:
 	if chart == null or chart.id != id:
 		return {"error": "Could not read this chart."}
 	if _web == null:
-		bytes = FileAccess.get_file_as_bytes(_audio_path(chart.audio_id))
-	var stream := decode_song(bytes)
+		bytes = FileAccess.get_file_as_bytes(_audio_path(chart.audio_id, chart.audio_name))
+	var stream := await decode_song(bytes, chart.audio_name)
 	if stream == null:
 		return {"error": "The saved song could not be opened."}
 	return {"chart": chart, "stream": stream}
@@ -166,7 +169,7 @@ func save_chart(chart, new_audio: PackedByteArray) -> String:
 		return response[0]
 	if DirAccess.make_dir_recursive_absolute(directory) != OK:
 		return "Could not create the local chart folder."
-	var audio_path := _audio_path(chart.audio_id)
+	var audio_path := _audio_path(chart.audio_id, chart.audio_name)
 	if not FileAccess.file_exists(audio_path):
 		if new_audio.is_empty() or not _write_atomic(audio_path, new_audio):
 			return "Could not save the imported song."
@@ -190,11 +193,15 @@ static func read_song_file(path: String) -> Dictionary:
 	if file == null:
 		return {"error": "Could not read the selected song."}
 	if file.get_length() > MAX_AUDIO_BYTES:
-		return {"error": "Choose a WAV file under 128 MiB."}
+		return {"error": "Choose an MP3 or WAV file under 128 MiB."}
 	return {"name": path.get_file(), "bytes": file.get_buffer(file.get_length())}
 
-static func decode_song(bytes: PackedByteArray) -> AudioStreamWAV:
-	if bytes.size() < 44 or bytes.size() > MAX_AUDIO_BYTES:
+func decode_song(bytes: PackedByteArray, filename: String) -> AudioStreamWAV:
+	if bytes.is_empty() or bytes.size() > MAX_AUDIO_BYTES:
+		return null
+	if filename.get_extension().to_lower() == "mp3":
+		return await _decode_mp3(bytes)
+	if bytes.size() < 44:
 		return null
 	var stream := AudioStreamWAV.load_from_buffer(bytes)
 	if stream == null or stream.get_length() <= 0.0 or stream.format not in [AudioStreamWAV.FORMAT_8_BITS, AudioStreamWAV.FORMAT_16_BITS]:
@@ -202,8 +209,52 @@ static func decode_song(bytes: PackedByteArray) -> AudioStreamWAV:
 	stream.loop_mode = AudioStreamWAV.LOOP_DISABLED
 	return stream
 
-func _audio_path(id: String) -> String:
-	return directory.path_join(id + ".wav")
+func _decode_mp3(bytes: PackedByteArray) -> AudioStreamWAV:
+	var mp3 := AudioStreamMP3.load_from_buffer(bytes)
+	if mp3 == null:
+		return null
+	var expected_frames := roundi(mp3.get_length() * MP3_DECODE_RATE)
+	var expected_size := expected_frames * PCM_STEREO_FRAME_BYTES
+	if expected_size <= 0 or expected_size > MAX_AUDIO_BYTES:
+		return null
+	var pcm := PackedByteArray()
+	if pcm.resize(expected_size) != OK:
+		return null
+
+	# Mix a private playback so preview, playtest, and waveform share the same decoded samples.
+	var decoder := mp3.instantiate_playback()
+	if decoder == null:
+		return null
+	decoder.start()
+	var rate_scale := float(AudioServer.get_mix_rate()) / MP3_DECODE_RATE
+	var frames_written := 0
+	while frames_written < expected_frames:
+		var count := mini(MP3_FRAMES_PER_PASS, expected_frames - frames_written)
+		var samples := decoder.mix_audio(rate_scale, count)
+		for frame in samples:
+			var offset := frames_written * PCM_STEREO_FRAME_BYTES
+			pcm.encode_s16(offset, clampi(roundi(frame.x * 32768.0), -32768, 32767))
+			pcm.encode_s16(offset + 2, clampi(roundi(frame.y * 32768.0), -32768, 32767))
+			frames_written += 1
+		if samples.size() < count:
+			break
+		if frames_written < expected_frames:
+			await get_tree().process_frame
+	decoder.stop()
+	if frames_written == 0:
+		return null
+	pcm.resize(frames_written * PCM_STEREO_FRAME_BYTES)
+
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = MP3_DECODE_RATE
+	stream.stereo = true
+	stream.data = pcm
+	return stream
+
+func _audio_path(id: String, filename: String) -> String:
+	var extension := ".mp3" if filename.get_extension().to_lower() == "mp3" else ".wav"
+	return directory.path_join(id + extension)
 
 func _write_atomic(path: String, contents: PackedByteArray) -> bool:
 	var temporary := path + "." + Chart.new_id() + ".tmp"

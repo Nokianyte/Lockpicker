@@ -26,3 +26,12 @@ static func core(canvas: CanvasItem, center: Vector2, zoom: float, heading: floa
 static func ring(canvas: CanvasItem, center: Vector2, zoom: float, radius: float, angle: float, color: Color, width: float) -> void:
 	for segment in G.segments(radius, angle):
 		canvas.draw_line(center + segment[0] * zoom, center + segment[1] * zoom, color, width, true)
+
+static func spiky_circle(canvas: CanvasItem, center: Vector2, radius: float, angle: float, ink: Color) -> void:
+	const POINTS := 20
+	var outline := PackedVector2Array()
+	for point in POINTS:
+		var direction := angle + TAU * point / POINTS
+		var tooth := radius * (1.35 if point % 2 == 0 else 0.72)
+		outline.append(center + Vector2.from_angle(direction) * tooth)
+	canvas.draw_colored_polygon(outline, ink)

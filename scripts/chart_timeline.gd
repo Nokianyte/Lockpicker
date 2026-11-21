@@ -5,13 +5,17 @@ signal placed(beat: float, lane: int, spike: bool)
 signal removed(index: int)
 signal moved(index: int, beat: float, lane: int)
 signal selected(index: int)
+signal zone_selected(index: int)
+signal zone_moved(index: int, beat: float)
 
 const Chart = preload("res://scripts/song_chart.gd")
+const Art = preload("res://scripts/arena_art.gd")
 const Palette = preload("res://scripts/palette.gd")
 const LEFT := 59.0
 const RULER := 36.0
 const RIGHT := 12.0
 const BOTTOM := 16.0
+const ZONE_HANDLE_Y := 30.0
 
 var chart: Chart
 var waveform: PackedFloat32Array
@@ -19,12 +23,16 @@ var waveform_completed := 0
 var waveform_bins_per_second := 0.0
 var show_waveform := true
 var duration := 0.0
+var playback_start := 0.0
+var playback_end := 0.0
 var playhead := 0.0
 var selection := -1
+var zone_selection := -1
 var start_time := 0.0
 var span := 8.0
 
 var _drag_index := -1
+var _drag_zone := -1
 var _drag_origin := Vector2.ZERO
 var _drag_position := Vector2.ZERO
 
@@ -38,11 +46,13 @@ func reset_view() -> void:
 	start_time = 0.0
 	span = 8.0
 	selection = -1
-	_drag_index = -1
+	zone_selection = -1
+	cancel_drag()
 	queue_redraw()
 
 func cancel_drag() -> void:
 	_drag_index = -1
+	_drag_zone = -1
 
 func update_playhead(time: float, follow: bool) -> void:
 	playhead = time
@@ -100,10 +110,60 @@ func _draw() -> void:
 		var x := _x_at(chart.time_at(chart.snap(_time_at(_drag_position.x))))
 		if x >= LEFT and x <= plot.end.x:
 			_draw_marker(Vector2(x, _y_at(_lane_at(_drag_position.y))), chart.events[_drag_index].spike, true)
+	_draw_trimmed_ranges(plot)
+	_draw_zones(plot)
 	var cursor_x := _x_at(playhead)
 	if cursor_x >= LEFT and cursor_x <= plot.end.x:
 		draw_line(Vector2(cursor_x, 5), Vector2(cursor_x, plot.end.y), Palette.RED, 1.5)
 		draw_colored_polygon(PackedVector2Array([Vector2(cursor_x - 5, 4), Vector2(cursor_x + 5, 4), Vector2(cursor_x, 11)]), Palette.RED)
+
+func _draw_zones(plot: Rect2) -> void:
+	for index in chart.zones.size():
+		var beat: float = chart.zones[index].beat
+		if index == _drag_zone and absf(_drag_position.x - _drag_origin.x) >= 4.0:
+			var candidate := chart.snap(_time_at(_drag_position.x))
+			if _valid_beat(candidate) and chart.zone_at(candidate) < 0:
+				beat = candidate
+		var x := _x_at(chart.time_at(beat))
+		if x < LEFT or x > plot.end.x:
+			continue
+		var active := index == zone_selection
+		var color := Palette.INK if active else Palette.MUTED
+		draw_line(Vector2(x, ZONE_HANDLE_Y), Vector2(x, plot.end.y), color, 2.0 if active else 1.0)
+		var handle := Vector2(x, ZONE_HANDLE_Y)
+		draw_colored_polygon(PackedVector2Array([
+			handle + Vector2(0, -5), handle + Vector2(6, 0),
+			handle + Vector2(0, 5), handle + Vector2(-6, 0),
+		]), color)
+
+func _zone_at(x: float) -> int:
+	var best := -1
+	var distance := 8.0
+	for index in chart.zones.size():
+		var handle_x := _x_at(chart.time_at(chart.zones[index].beat))
+		if handle_x < LEFT or handle_x > size.x - RIGHT:
+			continue
+		var delta := absf(handle_x - x)
+		if delta < distance:
+			distance = delta
+			best = index
+	return best
+
+func _draw_trimmed_ranges(plot: Rect2) -> void:
+	var shade := Color(Palette.PAPER, 0.68)
+	var height := plot.end.y
+	if playback_start > 0.0:
+		var first := clampf(_x_at(0.0), LEFT, plot.end.x)
+		var last := clampf(_x_at(playback_start), LEFT, plot.end.x)
+		draw_rect(Rect2(first, 0.0, last - first, height), shade)
+		if last > first and last < plot.end.x:
+			draw_line(Vector2(last, 0.0), Vector2(last, height), Palette.RULE, 1.5)
+	if playback_end < duration:
+		var first := clampf(_x_at(playback_end), LEFT, plot.end.x)
+		var last := clampf(_x_at(duration), LEFT, plot.end.x)
+		draw_rect(Rect2(first, 0.0, last - first, height), shade)
+		if last > first and first > LEFT:
+			draw_line(Vector2(first, 0.0), Vector2(first, height), Palette.RULE, 1.5)
 
 func _draw_grid(plot: Rect2) -> void:
 	var subdivision := chart.subdivision
@@ -143,8 +203,7 @@ func _draw_marker(point: Vector2, spike: bool, highlighted: bool) -> void:
 	if highlighted:
 		draw_circle(point, 11.0, Palette.RED, false, 1.45, true)
 	if spike:
-		var triangle := PackedVector2Array([point + Vector2(0, -7), point + Vector2(7, 6), point + Vector2(-7, 6)])
-		draw_colored_polygon(triangle, Palette.SPIKE)
+		Art.spiky_circle(self, point, 5.6, -PI / 2.0, Palette.SPIKE)
 	else:
 		draw_circle(point, 6.0, Palette.INK, true, -1, true)
 
@@ -163,13 +222,21 @@ func _marker_at(point: Vector2, radius: float = 10.0) -> int:
 func _gui_input(event: InputEvent) -> void:
 	if chart == null:
 		return
-	if event is InputEventMouseMotion and _drag_index >= 0:
+	if event is InputEventMouseMotion and (_drag_index >= 0 or _drag_zone >= 0):
 		_drag_position = event.position
 		queue_redraw()
 		accept_event()
 	elif event is InputEventMouseButton:
 		if event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			_scroll(event)
+		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and _drag_zone >= 0:
+			var index := _drag_zone
+			_drag_zone = -1
+			if absf(event.position.x - _drag_origin.x) >= 4.0 and event.position.x >= LEFT and event.position.x <= size.x - RIGHT:
+				var beat := chart.snap(_time_at(event.position.x))
+				if _valid_beat(beat):
+					zone_moved.emit(index, beat)
+			queue_redraw()
 		elif event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and _drag_index >= 0:
 			var index := _drag_index
 			_drag_index = -1
@@ -187,7 +254,14 @@ func _click(event: InputEventMouseButton) -> void:
 	var point := event.position
 	if point.y < RULER:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			sought.emit(clampf(_time_at(point.x), 0.0, duration))
+			var index := _zone_at(point.x) if absf(point.y - ZONE_HANDLE_Y) <= 8.0 else -1
+			if index >= 0:
+				zone_selected.emit(index)
+				_drag_zone = index
+				_drag_origin = point
+				_drag_position = point
+			else:
+				sought.emit(clampf(_time_at(point.x), 0.0, duration))
 	elif point.y < RULER + _plot_height():
 		if event.button_index == MOUSE_BUTTON_RIGHT:
 			var index := _marker_at(point)
@@ -228,5 +302,8 @@ func _scroll(event: InputEventMouseButton) -> void:
 		var time := chart.time_at(item.beat)
 		earliest = minf(earliest, time - 0.15)
 		end = maxf(end, time + 0.15)
+	if not chart.zones.is_empty():
+		earliest = minf(earliest, chart.time_at(chart.zones.front().beat) - 0.15)
+		end = maxf(end, chart.time_at(chart.zones.back().beat) + 0.15)
 	start_time = clampf(start_time, earliest, maxf(earliest, end - span * 0.25))
 	queue_redraw()

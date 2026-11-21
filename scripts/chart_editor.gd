@@ -6,6 +6,7 @@ signal play_requested(chart, stream: AudioStreamWAV, cursor: float, from_editor:
 const Arena = preload("res://scripts/song_arena.gd")
 const Chart = preload("res://scripts/song_chart.gd")
 const Library = preload("res://scripts/chart_library.gd")
+const T = preload("res://scripts/tuning.gd")
 const Timeline = preload("res://scripts/chart_timeline.gd")
 const Transport = preload("res://scripts/song_transport.gd")
 const Waveform = preload("res://scripts/song_waveform.gd")
@@ -33,12 +34,20 @@ var _song_name: Label
 var _time: Label
 var _bpm: SpinBox
 var _offset: SpinBox
+var _start_offset: SpinBox
+var _end_offset: SpinBox
 var _grid: OptionButton
 var _transport_button: Button
 var _play_button: Button
 var _cursor_button: Button
 var _save_button: Button
 var _import_button: Button
+var _add_zone_button: Button
+var _delete_zone_button: Button
+var _chart_settings: VBoxContainer
+var _zone_settings: VBoxContainer
+var _zone_time: Label
+var _zone_fields: Dictionary[String, SpinBox] = {}
 var _file_dialog: FileDialog
 var _leave_dialog: ConfirmationDialog
 
@@ -81,6 +90,8 @@ func _ready() -> void:
 	timeline.removed.connect(_remove)
 	timeline.moved.connect(_move)
 	timeline.selected.connect(_select)
+	timeline.zone_selected.connect(_select_zone)
+	timeline.zone_moved.connect(_move_zone)
 	transport.song_ended.connect(func() -> void:
 		_update_transport_button()
 		_update_position()
@@ -172,8 +183,9 @@ func _build_header() -> HBoxContainer:
 func _build_settings() -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = SIZE_EXPAND_FILL
-	var settings := VBoxContainer.new()
-	panel.add_child(settings)
+	_chart_settings = VBoxContainer.new()
+	panel.add_child(_chart_settings)
+	var settings := _chart_settings
 	settings.add_child(UI.label("Info / Settings", 20))
 	var song := HBoxContainer.new()
 	settings.add_child(song)
@@ -193,6 +205,28 @@ func _build_settings() -> PanelContainer:
 		_timing_changed()
 	)
 	offset_row.add_child(_offset)
+	var trim_row := HBoxContainer.new()
+	settings.add_child(trim_row)
+	trim_row.add_child(UI.label("Start offset", 15))
+	_start_offset = _spin(0.0, 0.0, 0.001, 96)
+	_start_offset.suffix = "s"
+	_start_offset.tooltip_text = "Seconds skipped from the beginning of the song."
+	_start_offset.value_changed.connect(func(value: float) -> void:
+		chart.start_offset = value
+		_update_playback_range()
+		_set_dirty()
+	)
+	trim_row.add_child(_start_offset)
+	trim_row.add_child(UI.label("End offset", 15))
+	_end_offset = _spin(0.0, 0.0, 0.001, 96)
+	_end_offset.suffix = "s"
+	_end_offset.tooltip_text = "Seconds skipped from the end of the song."
+	_end_offset.value_changed.connect(func(value: float) -> void:
+		chart.end_offset = value
+		_update_playback_range()
+		_set_dirty()
+	)
+	trim_row.add_child(_end_offset)
 	var waveform := CheckButton.new()
 	waveform.text = "Waveform"
 	waveform.button_pressed = true
@@ -201,7 +235,45 @@ func _build_settings() -> PanelContainer:
 		timeline.queue_redraw()
 	)
 	settings.add_child(waveform)
+	panel.add_child(_build_zone_settings())
 	return panel
+
+func _build_zone_settings() -> VBoxContainer:
+	_zone_settings = VBoxContainer.new()
+	var header := HBoxContainer.new()
+	_zone_settings.add_child(header)
+	var title := UI.label("Zone settings", 20)
+	title.size_flags_horizontal = SIZE_EXPAND_FILL
+	header.add_child(title)
+	_zone_time = UI.label("", 14, UI.MUTED)
+	header.add_child(_zone_time)
+	header.add_child(UI.button("‹ Chart", _select_zone.bind(-1)))
+	_delete_zone_button = UI.button("Delete zone", _delete_zone)
+	header.add_child(_delete_zone_button)
+	var fields := GridContainer.new()
+	fields.columns = 4
+	fields.add_theme_constant_override("h_separation", 8)
+	fields.add_theme_constant_override("v_separation", 6)
+	_zone_settings.add_child(fields)
+	_add_zone_field(fields, "Spawn distance", "spawn_radius", Chart.MIN_SPAWN_RADIUS, T.OUTER_RADIUS, 1.0, "", "Initial polygon radius from the center.")
+	_add_zone_field(fields, "Start speed", "start_speed", Chart.MIN_APPROACH_SPEED, Chart.MAX_APPROACH_SPEED, 1.0, "", "Approach speed at the beginning, in units per second.")
+	_add_zone_field(fields, "Rotation offset", "rotation_offset", -360.0, 360.0, 0.1, "°", "Initial rotation relative to the charted direction.")
+	_add_zone_field(fields, "End speed", "end_speed", Chart.MIN_APPROACH_SPEED, Chart.MAX_APPROACH_SPEED, 1.0, "", "Approach speed at the end, in units per second.")
+	_add_zone_field(fields, "Center rotation speed", "center_rotation_speed", -Chart.MAX_CENTER_ROTATION_SPEED, Chart.MAX_CENTER_ROTATION_SPEED, 0.1, "°/s", "Rotates the entire arena during this zone. Positive values turn clockwise and negative values turn counterclockwise.")
+	_zone_settings.add_child(HSeparator.new())
+	_zone_settings.add_child(UI.label("Additional effects", 15, UI.MUTED))
+	_zone_settings.hide()
+	return _zone_settings
+
+func _add_zone_field(parent: GridContainer, label: String, key: String, minimum: float, maximum: float, step: float, suffix: String, hint: String) -> void:
+	parent.add_child(UI.label(label, 14))
+	var field := _spin(minimum, maximum, step, 77)
+	field.size_flags_horizontal = SIZE_EXPAND_FILL
+	field.suffix = suffix
+	field.tooltip_text = hint
+	field.value_changed.connect(_change_zone.bind(key))
+	parent.add_child(field)
+	_zone_fields[key] = field
 
 func _build_transport() -> HBoxContainer:
 	var bar := HBoxContainer.new()
@@ -228,6 +300,9 @@ func _build_transport() -> HBoxContainer:
 		timeline.queue_redraw()
 	)
 	bar.add_child(_grid)
+	_add_zone_button = UI.button("+ Zone", _add_zone)
+	_add_zone_button.tooltip_text = "Add a zone at the nearest grid line to the playhead. Click its diamond marker to edit or drag it to move."
+	bar.add_child(_add_zone_button)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
 	bar.add_child(spacer)
@@ -297,7 +372,7 @@ func _open_saved(id: String, play: bool) -> void:
 func _open_editor(draft: Chart, stream: AudioStreamWAV) -> void:
 	chart = draft
 	_undo.clear()
-	_audio.clear()
+	_audio = PackedByteArray()
 	_dirty = false
 	_status.text = ""
 	_title.text = chart.title
@@ -306,6 +381,7 @@ func _open_editor(draft: Chart, stream: AudioStreamWAV) -> void:
 	_grid.select(Chart.SUBDIVISIONS.find(chart.subdivision))
 	timeline.chart = chart
 	timeline.reset_view()
+	_select_zone(-1)
 	_load_song(stream)
 	_library_screen.hide()
 	_editor_screen.show()
@@ -326,10 +402,28 @@ func _load_song(stream: AudioStreamWAV) -> void:
 	_song_name.text = "No song selected" if stream == null else chart.audio_name
 	_song_name.tooltip_text = chart.audio_name
 	_waveform.begin(stream)
+	_update_playback_range()
+	_refresh_actions()
+
+func _update_playback_range() -> void:
+	var length := transport.duration()
+	chart.start_offset = minf(chart.start_offset, Chart.max_song_offset(length))
+	chart.end_offset = minf(chart.end_offset, Chart.max_song_offset(length, chart.start_offset))
+	var bounds := chart.playback_bounds(length)
+	transport.set_playback_range(bounds.start, bounds.end)
+	timeline.playback_start = bounds.start
+	timeline.playback_end = bounds.end
+	_start_offset.set_block_signals(true)
+	_end_offset.set_block_signals(true)
+	_start_offset.max_value = Chart.max_song_offset(length, chart.end_offset)
+	_end_offset.max_value = Chart.max_song_offset(length, chart.start_offset)
+	_start_offset.set_value_no_signal(chart.start_offset)
+	_end_offset.set_value_no_signal(chart.end_offset)
+	_start_offset.set_block_signals(false)
+	_end_offset.set_block_signals(false)
 	_refresh_schedule()
 	_update_transport_button()
-	_update_position()
-	_refresh_actions()
+	_update_position(true)
 
 func _import_song() -> void:
 	if _busy:
@@ -364,12 +458,13 @@ func _accept_song(result: Dictionary) -> void:
 	chart.audio_name = result.name
 	_audio = result.bytes
 	timeline.reset_view()
+	_select_zone(-1)
 	_load_song(stream)
 	_set_dirty()
 	_show_status("Song imported")
 
 func _save_chart() -> void:
-	if _busy or transport.stream == null:
+	if _busy or transport.song == null:
 		return
 	if chart.title.strip_edges().is_empty():
 		_show_status("Enter a chart name.", true)
@@ -382,25 +477,31 @@ func _save_chart() -> void:
 	if snapshot == null:
 		_busy = false
 		_refresh_actions()
-		_show_status("The chart contains invalid timing or events.", true)
+		_show_status("The chart contains invalid timing, events, or zones.", true)
 		return
 	var error: String = await library.save_chart(snapshot, _audio)
 	_busy = false
 	if error.is_empty():
 		_dirty = snapshot.record() != chart.record()
-		_audio.clear()
+		_audio = PackedByteArray()
 		_show_status("Saved")
 	else:
 		_show_status(error, true)
 	_refresh_actions()
 
 func _refresh_actions() -> void:
-	var no_song := transport.stream == null
+	var no_song := transport.song == null
 	_import_button.disabled = _busy
 	_save_button.disabled = _busy or no_song
 	_play_button.disabled = _busy or no_song
-	_cursor_button.disabled = _busy or no_song
+	_cursor_button.disabled = _busy or transport.song_time() >= transport.playback_end
 	_transport_button.disabled = no_song
+	_add_zone_button.disabled = _busy or no_song
+	_delete_zone_button.disabled = _busy
+	for field in _zone_fields.values():
+		field.editable = not _busy
+	_start_offset.editable = not _busy and not no_song
+	_end_offset.editable = not _busy and not no_song
 
 func _show_status(message: String, error: bool = false) -> void:
 	_status.text = message
@@ -413,40 +514,111 @@ func _set_dirty() -> void:
 
 func _timing_changed() -> void:
 	_set_dirty()
+	_refresh_zone_settings()
 	_refresh_schedule()
 	timeline.queue_redraw()
 
 func _refresh_schedule() -> void:
-	preview.events = chart.schedule()
+	preview.events = chart.schedule(transport.playback_start, transport.playback_end)
+	preview.approach_horizon = chart.approach_horizon()
+	preview.center_rotation_track = chart.center_rotation_track()
 	preview.queue_redraw()
 
-func _edit_events() -> void:
-	_undo.append(chart.events.duplicate())
+func _remember_edit() -> void:
+	_undo.append({"events": chart.events.duplicate(), "zones": chart.zones.duplicate()})
 	if _undo.size() > 100:
 		_undo.pop_front()
 
 func _place(beat: float, lane: int, spike: bool) -> void:
 	if chart.event_at(beat, lane) >= 0:
 		return
-	_edit_events()
+	_remember_edit()
 	chart.events.append({"beat": beat, "lane": lane, "spike": spike})
 	_after_edit(chart.events.size() - 1)
 
 func _remove(index: int) -> void:
-	_edit_events()
+	_remember_edit()
 	chart.events.remove_at(index)
 	_after_edit(-1)
 
 func _move(index: int, beat: float, lane: int) -> void:
 	if chart.event_at(beat, lane) >= 0:
 		return
-	_edit_events()
+	_remember_edit()
 	chart.events[index] = {"beat": beat, "lane": lane, "spike": chart.events[index].spike}
 	_after_edit(index)
 
 func _select(index: int) -> void:
 	timeline.selection = index
 	timeline.queue_redraw()
+
+func _add_zone() -> void:
+	if _busy or transport.song == null:
+		return
+	var first_tick := ceili(chart.beat_at(0.0) * chart.subdivision)
+	var last_tick := ceili(chart.beat_at(transport.duration()) * chart.subdivision) - 1
+	if first_tick > last_tick:
+		_show_status("There is no grid line inside the song.", true)
+		return
+	var tick := roundi(chart.beat_at(transport.song_time()) * chart.subdivision)
+	var beat := float(clampi(tick, first_tick, last_tick)) / chart.subdivision
+	var existing := chart.zone_at(beat)
+	if existing >= 0:
+		_select_zone(existing)
+		return
+	_remember_edit()
+	chart.zones.append(Chart.new_zone(beat))
+	chart.sort_zones()
+	_after_zone_edit(chart.zone_at(beat))
+
+func _select_zone(index: int) -> void:
+	timeline.zone_selection = index
+	_chart_settings.visible = index < 0
+	_zone_settings.visible = index >= 0
+	_refresh_zone_settings()
+	timeline.queue_redraw()
+
+func _refresh_zone_settings() -> void:
+	if timeline.zone_selection < 0:
+		return
+	var zone := chart.zones[timeline.zone_selection]
+	_zone_time.text = UI.clock(chart.time_at(zone.beat))
+	for key in _zone_fields:
+		_zone_fields[key].set_value_no_signal(zone[key])
+
+func _move_zone(index: int, beat: float) -> void:
+	if _busy or chart.zone_at(beat) >= 0:
+		return
+	_remember_edit()
+	var zone := chart.zones[index].duplicate()
+	zone.beat = beat
+	chart.zones[index] = zone
+	chart.sort_zones()
+	_after_zone_edit(chart.zone_at(beat))
+
+func _change_zone(value: float, key: String) -> void:
+	var index := timeline.zone_selection
+	if _busy or index < 0:
+		return
+	_remember_edit()
+	var zone := chart.zones[index].duplicate()
+	zone[key] = value
+	chart.zones[index] = zone
+	_set_dirty()
+	_refresh_schedule()
+
+func _delete_zone() -> void:
+	if _busy or timeline.zone_selection < 0:
+		return
+	_remember_edit()
+	chart.zones.remove_at(timeline.zone_selection)
+	_after_zone_edit(-1)
+
+func _after_zone_edit(selection: int) -> void:
+	timeline.cancel_drag()
+	_select_zone(selection)
+	_set_dirty()
+	_refresh_schedule()
 
 func _after_edit(selection: int) -> void:
 	timeline.cancel_drag()
@@ -464,8 +636,8 @@ func _toggle_preview() -> void:
 	if transport.running:
 		pause_preview()
 	else:
-		if transport.song_time() >= transport.duration():
-			transport.seek_to(0.0)
+		if transport.song_time() >= transport.playback_end:
+			transport.seek_to(transport.playback_start)
 		transport.resume_song()
 		_update_transport_button()
 
@@ -481,17 +653,20 @@ func pause_preview() -> void:
 func _update_transport_button() -> void:
 	_transport_button.text = "Pause" if transport.running else "Play"
 
-func _update_position() -> void:
+func _update_position(follow: bool = false) -> void:
 	var time := transport.song_time()
 	_time.text = UI.clock(time)
-	timeline.update_playhead(time, transport.running)
+	_cursor_button.disabled = _busy or time >= transport.playback_end
+	timeline.update_playhead(time, follow or transport.running)
 	preview.song_time = time
 	preview.queue_redraw()
 
 func _play(from_cursor: bool) -> void:
-	if not _busy and transport.stream != null:
+	if not _busy and transport.song != null:
 		pause_preview()
-		play_requested.emit(chart, transport.stream, transport.song_time() if from_cursor else 0.0, true)
+		var cursor := transport.song_time() if from_cursor else transport.playback_start
+		if cursor < transport.playback_end:
+			play_requested.emit(chart, transport.song, cursor, true)
 
 func _process(_delta: float) -> void:
 	if is_visible_in_tree() and _editor_screen.visible and transport.running:
@@ -501,6 +676,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or not _editor_screen.visible or not event is InputEventKey or not event.pressed or event.echo:
 		return
 	if (event.ctrl_pressed or event.meta_pressed) and event.keycode == KEY_Z and not _undo.is_empty():
-		chart.events.assign(_undo.pop_back())
+		var snapshot: Dictionary = _undo.pop_back()
+		var zone_beat := -INF if timeline.zone_selection < 0 else float(chart.zones[timeline.zone_selection].beat)
+		chart.events.assign(snapshot.events)
+		chart.zones.assign(snapshot.zones)
+		_select_zone(chart.zone_at(zone_beat))
 		_after_edit(-1)
 		get_viewport().set_input_as_handled()

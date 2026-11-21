@@ -4,8 +4,15 @@ const T = preload("res://scripts/tuning.gd")
 const VERSION := 1
 const MIN_BPM := 10.0
 const MAX_BPM := 600.0
+const MIN_PLAYBACK_SECONDS := 0.001
 const SUBDIVISIONS := [1, 2, 4, 8, 16, 32]
 const DIRECTIONS := ["Up", "Upper right", "Lower right", "Down", "Lower left", "Upper left"]
+const MIN_SPAWN_RADIUS := T.SONG_CORE_RADIUS + 1.0
+const DEFAULT_APPROACH := 1.65
+const MIN_APPROACH_SPEED := 30.0
+const MAX_APPROACH_SPEED := 2000.0
+const DEFAULT_APPROACH_SPEED := 176.0
+const MAX_CENTER_ROTATION_SPEED := 3600.0
 
 var id := new_id()
 var title := "Untitled chart"
@@ -13,8 +20,11 @@ var audio_id := ""
 var audio_name := ""
 var bpm := 120.0
 var offset := 0.0
+var start_offset := 0.0
+var end_offset := 0.0
 var subdivision := 4
 var events: Array[Dictionary] = []
+var zones: Array[Dictionary] = []
 
 static func new_id() -> String:
 	return Crypto.new().generate_random_bytes(16).hex_encode()
@@ -43,18 +53,110 @@ func event_at(beat: float, lane: int) -> int:
 			return index
 	return -1
 
-func schedule() -> Array[Dictionary]:
+static func new_zone(beat: float) -> Dictionary:
+	return {
+		"beat": beat, "spawn_radius": T.OUTER_RADIUS,
+		"start_speed": DEFAULT_APPROACH_SPEED, "end_speed": DEFAULT_APPROACH_SPEED,
+		"rotation_offset": 0.0, "center_rotation_speed": 0.0,
+	}
+
+func zone_at(beat: float) -> int:
+	for index in zones.size():
+		if absf(float(zones[index].beat) - beat) < 0.000001:
+			return index
+	return -1
+
+func sort_zones() -> void:
+	zones.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.beat < b.beat)
+
+func center_rotation_track() -> Array[Dictionary]:
+	var track: Array[Dictionary] = []
+	var last_time := 0.0
+	var angle := 0.0
+	var speed := 0.0
+	for zone in zones:
+		var next_speed := deg_to_rad(zone.center_rotation_speed)
+		if next_speed == speed:
+			continue
+		var time := maxf(0.0, time_at(zone.beat))
+		angle = fposmod(angle + (time - last_time) * speed, TAU)
+		track.append({"time": time, "angle": angle, "speed": next_speed})
+		last_time = time
+		speed = next_speed
+	return track
+
+static func center_rotation_at(track: Array[Dictionary], at: float) -> float:
+	var low := 0
+	var high := track.size()
+	while low < high:
+		var middle := (low + high) >> 1
+		if track[middle].time <= at:
+			low = middle + 1
+		else:
+			high = middle
+	if low == 0:
+		return 0.0
+	var segment := track[low - 1]
+	return fposmod(float(segment.angle) + (at - float(segment.time)) * float(segment.speed), TAU)
+
+func approach_horizon() -> float:
+	var horizon := DEFAULT_APPROACH
+	for zone in zones:
+		horizon = maxf(horizon, _zone_duration(zone))
+	return horizon
+
+static func _zone_duration(zone: Dictionary) -> float:
+	return 2.0 * (float(zone.spawn_radius) - T.SONG_CORE_RADIUS) / (float(zone.start_speed) + float(zone.end_speed))
+
+static func remaining_approach(event: Dictionary, at: float) -> float:
+	var motion: Dictionary = event.get("motion", {})
+	var remaining := float(event.time) - at
+	if motion.is_empty():
+		return clampf(remaining / DEFAULT_APPROACH, 0.0, 1.0)
+	# Integrate linearly changing speed over the time left, then divide by total travel.
+	var fraction := clampf(remaining / float(motion.duration), 0.0, 1.0)
+	return fraction * (1.0 + float(motion.acceleration) * (1.0 - fraction))
+
+static func approach_angle(event: Dictionary, remaining: float) -> float:
+	var motion: Dictionary = event.get("motion", {})
+	return direction_angle(event.lane) + float(motion.get("rotation", 0.0)) * remaining
+
+static func max_song_offset(length: float, other_offset: float = 0.0) -> float:
+	return maxf(0.0, length - MIN_PLAYBACK_SECONDS - other_offset)
+
+func playback_bounds(length: float) -> Dictionary:
+	var start := minf(start_offset, max_song_offset(length))
+	var end_trim := minf(end_offset, max_song_offset(length, start))
+	return {"start": start, "end": length - end_trim}
+
+func schedule(start: float = -INF, end: float = INF) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for event in events:
-		result.append({"time": time_at(event.beat), "lane": event.lane, "spike": event.spike})
+		var time := time_at(event.beat)
+		if time >= start and time < end:
+			result.append({"time": time, "lane": event.lane, "spike": event.spike})
 	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.time < b.time)
+	var index := 0
+	var motion := {}
+	for event in result:
+		while index < zones.size() and time_at(zones[index].beat) <= event.time:
+			var zone := zones[index]
+			motion = {
+				"duration": _zone_duration(zone), "spawn_radius": zone.spawn_radius,
+				"acceleration": (float(zone.end_speed) - float(zone.start_speed)) / (float(zone.end_speed) + float(zone.start_speed)),
+				"rotation": deg_to_rad(zone.rotation_offset),
+			}
+			index += 1
+		if not motion.is_empty():
+			event.motion = motion
 	return result
 
 func record() -> Dictionary:
 	return {
 		"version": VERSION, "id": id, "title": title, "audio_id": audio_id,
 		"audio_name": audio_name, "bpm": bpm, "offset": offset,
-		"subdivision": subdivision, "events": events,
+		"start_offset": start_offset, "end_offset": end_offset,
+		"subdivision": subdivision, "events": events, "zones": zones,
 	}
 
 static func from_record(record: Variant) -> RefCounted:
@@ -65,6 +167,10 @@ static func from_record(record: Variant) -> RefCounted:
 	if not record.get("title") is String or record.title.strip_edges().is_empty() or not record.get("audio_name") is String:
 		return null
 	if not number_between(record.get("bpm"), MIN_BPM, MAX_BPM) or not number_between(record.get("offset"), -3600.0, 3600.0):
+		return null
+	var start: Variant = record.get("start_offset", 0.0)
+	var end: Variant = record.get("end_offset", 0.0)
+	if not number_between(start, 0.0, INF) or not number_between(end, 0.0, INF):
 		return null
 	if not number_between(record.get("subdivision"), 1, 32) or record.subdivision != int(record.subdivision) or not SUBDIVISIONS.has(int(record.subdivision)):
 		return null
@@ -77,6 +183,8 @@ static func from_record(record: Variant) -> RefCounted:
 	chart.audio_name = record.audio_name
 	chart.bpm = record.bpm
 	chart.offset = record.offset
+	chart.start_offset = start
+	chart.end_offset = end
 	chart.subdivision = int(record.subdivision)
 	var cells := {}
 	for event in record.events:
@@ -91,4 +199,28 @@ static func from_record(record: Variant) -> RefCounted:
 			return null
 		cells[cell] = true
 		chart.events.append({"beat": beat, "lane": lane, "spike": event.spike})
+	var saved_zones: Variant = record.get("zones", [])
+	if not saved_zones is Array:
+		return null
+	for zone in saved_zones:
+		if not zone is Dictionary or not number_between(zone.get("beat"), -1000000, 1000000):
+			return null
+		if not number_between(zone.get("spawn_radius"), MIN_SPAWN_RADIUS, T.OUTER_RADIUS):
+			return null
+		if not number_between(zone.get("start_speed"), MIN_APPROACH_SPEED, MAX_APPROACH_SPEED) or not number_between(zone.get("end_speed"), MIN_APPROACH_SPEED, MAX_APPROACH_SPEED):
+			return null
+		if not number_between(zone.get("rotation_offset"), -360.0, 360.0):
+			return null
+		var center_speed: Variant = zone.get("center_rotation_speed", 0.0)
+		if not number_between(center_speed, -MAX_CENTER_ROTATION_SPEED, MAX_CENTER_ROTATION_SPEED):
+			return null
+		chart.zones.append({
+			"beat": float(zone.beat), "spawn_radius": float(zone.spawn_radius),
+			"start_speed": float(zone.start_speed), "end_speed": float(zone.end_speed),
+			"rotation_offset": float(zone.rotation_offset), "center_rotation_speed": float(center_speed),
+		})
+	chart.sort_zones()
+	for index in range(1, chart.zones.size()):
+		if float(chart.zones[index].beat) - float(chart.zones[index - 1].beat) < 0.000001:
+			return null
 	return chart

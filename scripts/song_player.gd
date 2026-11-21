@@ -14,7 +14,6 @@ var arena := Arena.new()
 var session: Session
 
 var _schedule: Array[Dictionary] = []
-var _stream: AudioStreamWAV
 var _cursor := 0.0
 var _paused := false
 var _finished := false
@@ -96,8 +95,12 @@ func _build_result() -> void:
 
 func start_run(chart: Chart, stream: AudioStreamWAV, cursor: float) -> void:
 	_schedule = chart.schedule()
-	_stream = stream
-	_cursor = clampf(cursor, 0.0, stream.get_length())
+	arena.approach_horizon = chart.approach_horizon()
+	arena.center_rotation_track = chart.center_rotation_track()
+	transport.load_song(stream)
+	var bounds := chart.playback_bounds(transport.duration())
+	transport.set_playback_range(bounds.start, bounds.end)
+	_cursor = clampf(cursor, transport.playback_start, transport.playback_end)
 	_title.text = chart.title
 	_restart()
 
@@ -105,10 +108,9 @@ func _restart() -> void:
 	_paused = false
 	_finished = false
 	_veil.hide()
-	transport.load_song(_stream)
-	var start := maxf(0.0, _cursor - Session.LEAD_IN)
+	var start := maxf(transport.playback_start, _cursor - Session.LEAD_IN)
 	session = Session.new()
-	session.setup(_schedule, transport.duration(), _cursor, start)
+	session.setup(_schedule, transport.playback_end, _cursor, start)
 	arena.session = session
 	transport.start_at(start)
 	_update_view()
@@ -179,7 +181,7 @@ func _continue_run() -> void:
 
 func _song_ended() -> void:
 	if is_visible_in_tree() and session != null and not _finished:
-		session.advance_to(transport.duration(), true)
+		session.advance_to(transport.playback_end, true)
 		_update_view()
 		_end_run(session.energy > 0)
 

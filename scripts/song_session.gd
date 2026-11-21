@@ -4,7 +4,6 @@ const Chart = preload("res://scripts/song_chart.gd")
 const T = preload("res://scripts/tuning.gd")
 const G = preload("res://scripts/wall_geometry.gd")
 
-const APPROACH := 1.65
 const HIT_WINDOW := 0.10
 const LEAD_IN := 1.5
 const MAX_ENERGY := 100
@@ -50,10 +49,13 @@ func setup(schedule: Array[Dictionary], length: float, cursor: float, start: flo
 
 func ring_angle(index: int, at: float) -> float:
 	var event := events[index]
-	var angle := Chart.direction_angle(event.lane)
+	return Chart.approach_angle(event, Chart.remaining_approach(event, at)) + turn_offset(index, at)
+
+func turn_offset(index: int, at: float) -> float:
+	var event := events[index]
 	if _inner < events.size() and event.time == events[_inner].time:
-		angle += G.turn_angle(_turn_from, _turn_target, at - _turn_started)
-	return angle
+		return G.turn_angle(_turn_from, _turn_target, at - _turn_started)
+	return 0.0
 
 func rotate(direction: float, at: float) -> void:
 	advance_to(at)
@@ -79,7 +81,7 @@ func advance_to(at: float, finishing: bool = false) -> void:
 		if resolved[index]:
 			continue
 		if event.spike:
-			if G.gap_accepts_tip(T.TIP_ANGLE, ring_angle(index, event.time)):
+			if G.song_spike_aligns(ring_angle(index, event.time)):
 				spike_hits += 1
 				_penalize("Spike", deadline)
 		else:

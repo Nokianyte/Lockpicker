@@ -38,14 +38,25 @@ func _pause() -> void:
 		next_beat = ceili(game.time / Run.BEAT_SECONDS)
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.keycode in [KEY_Z, KEY_X]:
+	if event is InputEventKey:
+		if event.keycode not in [KEY_Z, KEY_X, KEY_LEFT, KEY_RIGHT]:
+			return
 		if event.pressed and not event.echo:
-			_press()
+			match event.keycode:
+				KEY_Z, KEY_X:
+					_press()
+				KEY_LEFT:
+					_turn(-1.0)
+				KEY_RIGHT:
+					_turn(1.0)
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-		_advance_clock()
-		game.rotate(-1.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0)
+		_turn(-1.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0)
 		get_viewport().set_input_as_handled()
+
+func _turn(direction: float) -> void:
+	_advance_clock()
+	game.rotate(direction)
 
 func _press() -> void:
 	if game.paused:
@@ -187,7 +198,7 @@ func _draw_ui(size: Vector2) -> void:
 	_draw_text("LOCKPICKER", Vector2(32, 51), 25)
 	_draw_text("SCORE  %04d" % game.score, Vector2(size.x - 178, 36), 17)
 	_draw_text("COMBO  %d" % game.combo, Vector2(size.x - 178, 60), 17, RED)
-	_centered("Scroll to align circles or dodge spikes   ·   Tap Z or X on beat", size.y - 32, 17, MUTED)
+	_centered("Scroll or press ← / → to align or dodge   ·   Tap Z or X on beat", size.y - 32, 17, MUTED)
 	if game.state == Run.State.TITLE:
 		_centered("Press Z or X to start  ·  100 BPM", size.y - 85, 24)
 	elif game.state == Run.State.CRASHED:

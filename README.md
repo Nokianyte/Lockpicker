@@ -1,6 +1,6 @@
 # Lockpicker rhythm prototype
 
-Scroll one notch to turn the innermost ring 60°. Line up its circle with the fixed red circle, then tap Z or X when both hexagons overlap on the beat.
+Scroll one notch or press the Left or Right Arrow to turn the innermost ring 60°. Line up its circle with the fixed red circle, then tap Z or X when both hexagons overlap on the beat.
 
 - **Z** and **X** are interchangeable. Either key starts the two-beat count-in, judges a tap during play, and resumes or replays from the corresponding screen. Each tap needs a fresh press.
 - **Perfect** (within 45 ms) earns 100 points. **Good** (within 100 ms) earns 50 points. Both require alignment.

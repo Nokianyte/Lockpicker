@@ -50,21 +50,23 @@ const assert = require('node:assert/strict');
     const started = Date.now();
     const waitUntil = elapsed => page.waitForTimeout(Math.max(0, elapsed - (Date.now() - started)));
     await page.keyboard.press('z');
-    await page.mouse.wheel(0, 120);
+    await page.keyboard.down('ArrowRight');
+    await page.keyboard.down('ArrowRight');
+    await page.keyboard.up('ArrowRight');
     await waitUntil(1200);
     await page.keyboard.down('z');
     await waitUntil(1340);
     const afterZ = await score();
-    assert.notDeepEqual(afterZ, zero, 'one ring turn and an on-beat Z should score');
+    assert.notDeepEqual(afterZ, zero, 'one Right Arrow turn should align the ring even after a repeated keydown');
     await save('rhythm-hit');
 
-    await page.mouse.wheel(0, -120);
+    await page.keyboard.press('ArrowLeft');
     await waitUntil(2400);
     await page.keyboard.down('x');
     await page.keyboard.up('z');
     await waitUntil(2540);
     const afterX = await score();
-    assert.notDeepEqual(afterX, afterZ, 'an on-beat X should score while Z is held');
+    assert.notDeepEqual(afterX, afterZ, 'Left Arrow should align the second ring and X should score while Z is held');
 
     await page.mouse.wheel(0, -120);
     await waitUntil(3600);
@@ -98,7 +100,7 @@ const assert = require('node:assert/strict');
     await save('rhythm-resize');
     assert.deepEqual(await page.evaluate(() => [scrollX, scrollY]), [0, 0]);
     assert.deepEqual(errors, []);
-    console.log(`${engine}: timed Z and X hits, key-repeat suppression, pause, resume, spike crash, retry and resize passed at ${target}`);
+    console.log(`${engine}: arrow and wheel turns, timed Z and X hits, key-repeat suppression, pause, resume, spike crash, retry and resize passed at ${target}`);
   } finally {
     await browser.close();
   }

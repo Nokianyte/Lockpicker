@@ -7,12 +7,11 @@ signal moved(index: int, beat: float, lane: int)
 signal selected(index: int)
 
 const Chart = preload("res://scripts/song_chart.gd")
+const Palette = preload("res://scripts/palette.gd")
 const LEFT := 59.0
 const RULER := 36.0
 const RIGHT := 12.0
 const BOTTOM := 16.0
-const NOTES := Color("a5f6c7")
-const SPIKES := Color("ff8e79")
 
 var chart: Chart
 var waveform: PackedFloat32Array
@@ -73,12 +72,12 @@ func _draw() -> void:
 	if chart == null:
 		return
 	var plot := Rect2(LEFT, RULER, _plot_width(), _plot_height())
-	draw_rect(Rect2(Vector2.ZERO, size), Color("0b141c"))
+	draw_rect(Rect2(Vector2.ZERO, size), Palette.PAPER)
 	for lane in 6:
 		var top := RULER + lane * plot.size.y / 6.0
-		draw_rect(Rect2(0, top, size.x, plot.size.y / 6.0), Color("111e28") if lane % 2 == 0 else Color("0e1922"))
-		draw_line(Vector2(0, top), Vector2(plot.end.x, top), Color("283843"))
-	draw_line(Vector2(0, plot.end.y), Vector2(plot.end.x, plot.end.y), Color("283843"))
+		draw_rect(Rect2(0, top, size.x, plot.size.y / 6.0), Palette.SURFACE if lane % 2 == 0 else Palette.PANEL)
+		draw_line(Vector2(0, top), Vector2(plot.end.x, top), Palette.BORDER)
+	draw_line(Vector2(0, plot.end.y), Vector2(plot.end.x, plot.end.y), Palette.BORDER)
 	if show_waveform and waveform_completed > 0 and duration > 0.0:
 		_draw_waveform(plot)
 	_draw_grid(plot)
@@ -88,10 +87,10 @@ func _draw() -> void:
 		var tip := center + axis * 8.0
 		var shoulder := tip - axis * 5.5
 		var width := axis.orthogonal() * 4.0
-		var ink := Color("a6bbc2")
+		var ink := Palette.MUTED
 		draw_line(center - axis * 7.0, tip, ink, 1.5, true)
 		draw_polyline(PackedVector2Array([shoulder + width, tip, shoulder - width]), ink, 1.5, true)
-	draw_line(Vector2(LEFT, 0), Vector2(LEFT, plot.end.y), Color("3b5159"))
+	draw_line(Vector2(LEFT, 0), Vector2(LEFT, plot.end.y), Palette.RULE)
 	for index in chart.events.size():
 		var item := chart.events[index]
 		var x := _x_at(chart.time_at(item.beat))
@@ -103,8 +102,8 @@ func _draw() -> void:
 			_draw_marker(Vector2(x, _y_at(_lane_at(_drag_position.y))), chart.events[_drag_index].spike, true)
 	var cursor_x := _x_at(playhead)
 	if cursor_x >= LEFT and cursor_x <= plot.end.x:
-		draw_line(Vector2(cursor_x, 5), Vector2(cursor_x, plot.end.y), Color("f7d685"), 1.5)
-		draw_colored_polygon(PackedVector2Array([Vector2(cursor_x - 5, 4), Vector2(cursor_x + 5, 4), Vector2(cursor_x, 11)]), Color("f7d685"))
+		draw_line(Vector2(cursor_x, 5), Vector2(cursor_x, plot.end.y), Palette.RED, 1.5)
+		draw_colored_polygon(PackedVector2Array([Vector2(cursor_x - 5, 4), Vector2(cursor_x + 5, 4), Vector2(cursor_x, 11)]), Palette.RED)
 
 func _draw_grid(plot: Rect2) -> void:
 	var subdivision := chart.subdivision
@@ -119,10 +118,10 @@ func _draw_grid(plot: Rect2) -> void:
 		var x := _x_at(chart.time_at(beat))
 		var bar := tick % (subdivision * 4) == 0
 		var whole := tick % subdivision == 0
-		var color := Color("53696e") if bar else (Color("364a52") if whole else Color("21323c"))
+		var color := Palette.RULE if bar else (Palette.BORDER if whole else Palette.LINE)
 		draw_line(Vector2(x, RULER if not whole else 24), Vector2(x, plot.end.y), color)
 		if bar and x < plot.end.x - 40:
-			draw_string(ThemeDB.fallback_font, Vector2(x + 5, 22), "%.1fs" % chart.time_at(beat), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("b4c7ce"))
+			draw_string(ThemeDB.fallback_font, Vector2(x + 5, 22), "%.1fs" % chart.time_at(beat), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Palette.MUTED)
 
 func _draw_waveform(plot: Rect2) -> void:
 	var center := plot.get_center().y
@@ -138,16 +137,16 @@ func _draw_waveform(plot: Rect2) -> void:
 			lines.append(Vector2(x, center - height))
 			lines.append(Vector2(x, center + height))
 	if not lines.is_empty():
-		draw_multiline(lines, Color("244748"))
+		draw_multiline(lines, Palette.WAVEFORM)
 
 func _draw_marker(point: Vector2, spike: bool, highlighted: bool) -> void:
 	if highlighted:
-		draw_circle(point, 11.0, Color("fbdb96"), false, 1.45, true)
+		draw_circle(point, 11.0, Palette.RED, false, 1.45, true)
 	if spike:
 		var triangle := PackedVector2Array([point + Vector2(0, -7), point + Vector2(7, 6), point + Vector2(-7, 6)])
-		draw_colored_polygon(triangle, SPIKES)
+		draw_colored_polygon(triangle, Palette.SPIKE)
 	else:
-		draw_circle(point, 6.0, NOTES, true, -1, true)
+		draw_circle(point, 6.0, Palette.INK, true, -1, true)
 
 func _marker_at(point: Vector2, radius: float = 10.0) -> int:
 	var lane := _lane_at(point.y)

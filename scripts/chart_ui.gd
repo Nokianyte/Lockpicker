@@ -1,11 +1,11 @@
 extends RefCounted
 
-const INK := Color("e8f3ee")
-const MUTED := Color("a6bbc2")
-const MINT := Color("a5f6c7")
-const RED := Color("ff9a84")
-const GOLD := Color("f7d685")
-const BACKGROUND := Color("091117")
+const Palette = preload("res://scripts/palette.gd")
+const INK := Palette.INK
+const MUTED := Palette.MUTED
+const ACCENT := Palette.RED
+const ERROR := Palette.SPIKE
+const BACKGROUND := Palette.PAPER
 
 static func box(fill: Color, border: Color, inset: float = 0.0) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -32,28 +32,47 @@ static func button(value: String, callback: Callable, primary: bool = false) -> 
 	result.custom_minimum_size.y = 35
 	result.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	if primary:
-		result.add_theme_stylebox_override("normal", box(Color("18332b"), Color("3c6b56"), 9))
-		result.add_theme_stylebox_override("hover", box(Color("224839"), MINT, 9))
-		result.add_theme_stylebox_override("pressed", box(Color("102a22"), MINT, 9))
-		result.add_theme_color_override("font_color", MINT)
+		result.add_theme_stylebox_override("normal", box(Palette.RED_WASH, ACCENT, 9))
+		result.add_theme_stylebox_override("hover", box(Palette.RED_HOVER, ACCENT, 9))
+		result.add_theme_stylebox_override("pressed", box(Palette.RED_PRESSED, ACCENT, 9))
 	result.pressed.connect(callback)
 	return result
 
 static func theme() -> Theme:
 	var result := Theme.new()
 	result.default_font_size = 15
-	for type in ["Button", "OptionButton"]:
-		result.set_stylebox("normal", type, box(Color("17232e"), Color("31434e"), 9))
-		result.set_stylebox("hover", type, box(Color("233440"), Color("52717b"), 9))
-		result.set_stylebox("pressed", type, box(Color("142b28"), Color("6a9e83"), 9))
-		result.set_stylebox("disabled", type, box(Color("101820"), Color("25313b"), 9))
-		result.set_color("font_color", type, INK)
-		result.set_color("font_disabled_color", type, Color("80939a"))
-	result.set_stylebox("normal", "LineEdit", box(Color("0c161e"), Color("354651"), 8))
-	result.set_stylebox("focus", "LineEdit", box(Color(0, 0, 0, 0), MINT))
+	for type in ["Button", "OptionButton", "CheckButton"]:
+		result.set_stylebox("normal", type, box(Palette.SURFACE, Palette.BORDER, 9))
+		result.set_stylebox("hover", type, box(Palette.PANEL, Palette.RULE, 9))
+		result.set_stylebox("pressed", type, box(Palette.RED_WASH, ACCENT, 9))
+		result.set_stylebox("hover_pressed", type, box(Palette.RED_HOVER, ACCENT, 9))
+		result.set_stylebox("disabled", type, box(Palette.PANEL, Palette.LINE, 9))
+		result.set_stylebox("focus", type, box(Color.TRANSPARENT, ACCENT))
+		for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+			result.set_color(state, type, INK)
+		result.set_color("font_disabled_color", type, MUTED)
+	result.set_color("font_color", "Label", INK)
+	result.set_stylebox("normal", "LineEdit", box(Palette.SURFACE, Palette.BORDER, 8))
+	result.set_stylebox("focus", "LineEdit", box(Color.TRANSPARENT, ACCENT))
 	result.set_color("font_color", "LineEdit", INK)
-	result.set_color("caret_color", "LineEdit", MINT)
-	result.set_stylebox("panel", "PanelContainer", box(Color("101a23"), Color("2b3e48"), 16))
+	result.set_color("font_placeholder_color", "LineEdit", MUTED)
+	result.set_color("font_selected_color", "LineEdit", INK)
+	result.set_color("selection_color", "LineEdit", Palette.RED_HOVER)
+	result.set_color("caret_color", "LineEdit", ACCENT)
+	for arrow in ["up", "down"]:
+		result.set_color(arrow + "_icon_modulate", "SpinBox", MUTED)
+		result.set_color(arrow + "_hover_icon_modulate", "SpinBox", INK)
+		result.set_color(arrow + "_pressed_icon_modulate", "SpinBox", ACCENT)
+	result.set_constant("modulate_arrow", "OptionButton", 1)
+	result.set_stylebox("panel", "PopupMenu", box(Palette.SURFACE, Palette.BORDER, 5))
+	result.set_stylebox("hover", "PopupMenu", box(Palette.RED_WASH, Palette.LINE))
+	result.set_color("font_color", "PopupMenu", INK)
+	result.set_color("font_hover_color", "PopupMenu", INK)
+	result.set_stylebox("panel", "PanelContainer", box(Palette.SURFACE, Palette.BORDER, 16))
+	result.set_stylebox("panel", "AcceptDialog", box(Palette.SURFACE, Palette.BORDER, 16))
+	result.set_stylebox("embedded_border", "Window", box(Palette.PANEL, Palette.BORDER))
+	result.set_stylebox("embedded_unfocused_border", "Window", box(Palette.PANEL, Palette.BORDER))
+	result.set_color("title_color", "Window", INK)
 	result.set_constant("separation", "VBoxContainer", 12)
 	result.set_constant("separation", "HBoxContainer", 10)
 	return result

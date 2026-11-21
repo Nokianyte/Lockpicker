@@ -1,0 +1,17 @@
+extends RefCounted
+
+const PAPER := Color("f9f8f4")
+const INK := Color("252325")
+const MUTED := Color("6d6667")
+const RED := Color("d8243d")
+const SPIKE := Color("a84b24")
+
+const SURFACE := Color("fffdf9")
+const PANEL := Color("f1ede7")
+const LINE := Color("e5ddd5")
+const BORDER := Color("c6b9ac")
+const RULE := Color("a89a8d")
+const WAVEFORM := Color("dbcbbd")
+const RED_WASH := Color("f7ebe9")
+const RED_HOVER := Color("f4dce0")
+const RED_PRESSED := Color("eed0d5")

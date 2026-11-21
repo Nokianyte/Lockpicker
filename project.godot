@@ -4,7 +4,7 @@ config_version=5
 config/name="Lockpicker"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
-config/description="Rotate the center piece to clear shrinking layers."
+config/description="Turn the inner ring and tap Z or X on beat."
 
 [display]
 window/size/viewport_width=1100
@@ -21,7 +21,7 @@ song_hit={
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-environment/defaults/default_clear_color=Color(0.025, 0.035, 0.06, 1)
+environment/defaults/default_clear_color=Color(0.976471, 0.972549, 0.956863, 1)
 
 [physics]
 common/physics_ticks_per_second=120

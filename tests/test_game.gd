@@ -1,6 +1,7 @@
 extends SceneTree
 
 const Model = preload("res://scripts/run_model.gd")
+const Rhythm = preload("res://scripts/rhythm_run.gd")
 const G = preload("res://scripts/wall_geometry.gd")
 const T = preload("res://scripts/tuning.gd")
 var failures := 0
@@ -101,5 +102,97 @@ func _initialize() -> void:
 			check(not game.walls.is_empty() and game.walls[-1].radius <= T.OUTER_RADIUS, "refill is bounded")
 			for j in range(1, game.walls.size()):
 				check(game.walls[j].radius - game.walls[j - 1].radius >= T.WALL_SPACING - 0.01, "rings remain separated")
+	_check_rhythm()
 	print("RESULT: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
+
+func _check_rhythm() -> void:
+	var game = Rhythm.new()
+	game.reset()
+	check(is_equal_approx(game.time, -1.2), "rhythm starts on a two-beat count-in")
+	var start_radius: float = game.radius(0)
+	var initial_gap: float = game.gap_angle(0)
+	var outer_gap: float = game.gap_angle(1)
+	game.rotate(1)
+	game.advance(T.TURN_DURATION / 2.0)
+	check(is_equal_approx(game.gap_angle(0), initial_gap + T.WHEEL_STEP / 2.0), "only the active ring eases through the wheel turn")
+	check(is_equal_approx(game.gap_angle(1), outer_gap), "the outer ring keeps its charted angle")
+	game.advance(1.12 - T.TURN_DURATION / 2.0)
+	check(game.radius(0) < start_radius, "the first ring approaches on the chart clock")
+	check(is_equal_approx(game.gap_angle(0), T.TIP_ANGLE), "one notch moves the first gap to the fixed tip")
+	game.tap()
+	check(game.good_hits == 1 and game.combo == 1 and game.score == 50, "an aligned 80 ms early tap is Good")
+	check(game.feedback == "GOOD · EARLY", "Good reports which side of the beat the tap landed on")
+	check(is_equal_approx(game.gap_angle(1), outer_gap), "a hit hands off to the next ring without rotating it")
+	var second_hit: float = game.hit_time(1)
+	game.advance(0.08)
+	game.tap()
+	check(game.next_note == 1 and game.score == 50, "an off-beat press cannot clear the following ring")
+	game.advance(second_hit - game.time)
+	check(is_equal_approx(game.radius(1), Rhythm.CORE_RADIUS), "the outer hexagon reaches the core size at its scheduled beat")
+	game.tap()
+	check(game.misses == 1 and game.combo == 0 and game.next_note == 2, "an on-beat misaligned tap misses only its ring")
+
+	game.reset()
+	game.rotate(1)
+	game.advance(1.33)
+	check(game.misses == 1 and game.next_note == 1 and game.state == Rhythm.State.PLAYING, "alignment alone misses, and the chart keeps playing")
+	game.rotate(-1)
+	game.paused = true
+	var paused_time: float = game.time
+	var paused_angle: float = game.gap_angle(1)
+	game.advance(1.0)
+	game.tap()
+	check(game.time == paused_time and game.gap_angle(1) == paused_angle and game.next_note == 1, "pause freezes timing, rotation, and judgment")
+	game.paused = false
+	game.advance(1.24 - game.time)
+	game.tap()
+	check(game.perfect_hits == 1 and game.score == 100, "an aligned 40 ms late tap is Perfect after resume")
+	game.advance(20)
+	check(game.state == Rhythm.State.CRASHED and game.is_spike(game.next_note), "a spike ends the run without a tap, even across a long frame")
+	check(game.time < game.hit_time(game.next_note), "the triangle's point hits before its base reaches the red circle")
+	check(is_equal_approx(game.time, game.hit_time(game.next_note) - (Rhythm.MARKER_RADIUS + Rhythm.SPIKE_DEPTH) / (Rhythm.APPROACH_SPEED * cos(PI / 6.0))), "collision freezes at first circle contact")
+	var crash_time: float = game.time
+	game.advance(1.0)
+	check(game.time == crash_time and game.score == 100, "a crash freezes time and preserves the run score")
+	game.reset()
+	check(game.score == 0 and game.best_combo == 0 and game.next_note == 0 and game.cleared.is_empty(), "replay resets rhythm results and effects")
+
+	game.advance(1.28)
+	game.rotate(1)
+	game.advance(0.04)
+	game.advance(T.TURN_DURATION)
+	check(game.next_note == 1 and is_equal_approx(game.gap_angle(1), outer_gap), "an expired ring's in-progress turn is discarded")
+
+	game.reset()
+	game.advance(3.8)
+	game.rotate(1)
+	game.advance(0.75)
+	check(game.state == Rhythm.State.PLAYING and game.is_spike(game.next_note), "a spike beside the marker stays safe while it approaches")
+	game.rotate(-1)
+	game.advance(0.25)
+	check(game.state == Rhythm.State.CRASHED and not is_zero_approx(game.ring_rotation), "turning into the circle can collide before the turn finishes")
+
+	game.reset()
+	for i in range(Rhythm.CHART.size()):
+		if game.is_spike(i):
+			var prior_score: int = game.score
+			var prior_combo: int = game.combo
+			game.tap()
+			check(game.next_note == i and game.score == prior_score, "a tap cannot clear a fake note")
+			game.rotate(1)
+			game.advance(game.hit_time(i) + Rhythm.SPIKE_PASS_WINDOW + 0.001 - game.time)
+			check(game.next_note == i + 1 and game.combo == prior_combo, "dodging a spike preserves the combo")
+			continue
+		var gap: float = game.gap_angle(i)
+		var steps := roundi(angle_difference(gap, T.TIP_ANGLE) / T.WHEEL_STEP)
+		check(absi(steps) <= 1, "each prototype ring needs at most one notch to reach the fixed tip")
+		if steps != 0:
+			game.rotate(steps)
+		game.advance(game.hit_time(i) - game.time)
+		check(G.point(game.radius(i), game.gap_angle(i), game.gap_angle(i)).is_equal_approx(Rhythm.marker_center()), "the circles share a center at the exact beat")
+		game.tap()
+	game.advance(1.0)
+	var playable_notes: int = Rhythm.CHART.size() - Rhythm.SPIKE_BEATS.size()
+	check(game.state == Rhythm.State.RESULTS and game.misses == 0, "the chart finishes with zero misses after all spikes are dodged")
+	check(game.perfect_hits == playable_notes and game.best_combo == playable_notes, "all real notes can be hit in one combo")

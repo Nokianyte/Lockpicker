@@ -7,6 +7,7 @@ const Chart = preload("res://scripts/song_chart.gd")
 const Session = preload("res://scripts/song_session.gd")
 const Transport = preload("res://scripts/song_transport.gd")
 const UI = preload("res://scripts/chart_ui.gd")
+const Palette = preload("res://scripts/palette.gd")
 
 var transport := Transport.new()
 var arena := Arena.new()
@@ -52,8 +53,8 @@ func _ready() -> void:
 	_energy.max_value = Session.MAX_ENERGY
 	_energy.show_percentage = false
 	_energy.custom_minimum_size.y = 8
-	_energy.add_theme_stylebox_override("background", UI.box(Color("16262e"), Color("30444a")))
-	_energy.add_theme_stylebox_override("fill", UI.box(UI.MINT, UI.MINT))
+	_energy.add_theme_stylebox_override("background", UI.box(Palette.PANEL, Palette.BORDER))
+	_energy.add_theme_stylebox_override("fill", UI.box(Palette.RED, Palette.RED))
 	content.add_child(_energy)
 	var stage := PanelContainer.new()
 	stage.size_flags_vertical = SIZE_EXPAND_FILL
@@ -64,13 +65,13 @@ func _ready() -> void:
 	var instructions := UI.label("Wheel  Aim      Space  Hit      Esc  Back", 15, UI.MUTED)
 	instructions.size_flags_horizontal = SIZE_EXPAND_FILL
 	footer.add_child(instructions)
-	_feedback = UI.label("", 18, UI.GOLD)
+	_feedback = UI.label("", 18, UI.ACCENT)
 	footer.add_child(_feedback)
 	_build_result()
 
 func _build_result() -> void:
 	_veil = ColorRect.new()
-	_veil.color = Color(0.025, 0.05, 0.07, 0.91)
+	_veil.color = Color(Palette.PAPER, 0.94)
 	add_child(_veil)
 	_veil.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	var center := CenterContainer.new()

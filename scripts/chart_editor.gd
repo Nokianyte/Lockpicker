@@ -1,6 +1,6 @@
 extends Control
 
-signal arcade_requested
+signal game_requested
 signal play_requested(chart, stream: AudioStreamWAV, cursor: float, from_editor: bool)
 
 const Arena = preload("res://scripts/song_arena.gd")
@@ -26,6 +26,7 @@ var _library_screen: VBoxContainer
 var _editor_screen: VBoxContainer
 var _library_rows: VBoxContainer
 var _library_status: Label
+var _back_to_game: Button
 var _status: Label
 var _title: LineEdit
 var _song_name: Label
@@ -91,10 +92,11 @@ func _build_library() -> VBoxContainer:
 	var screen := VBoxContainer.new()
 	var header := HBoxContainer.new()
 	screen.add_child(header)
-	header.add_child(UI.button("‹ Arcade", func() -> void:
+	_back_to_game = UI.button("‹ Rhythm", func() -> void:
 		if not _busy:
-			arcade_requested.emit()
-	))
+			game_requested.emit()
+	)
+	header.add_child(_back_to_game)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -117,6 +119,9 @@ func _build_library() -> VBoxContainer:
 	screen.add_child(scroll)
 	return screen
 
+func set_game_label(label: String) -> void:
+	_back_to_game.text = "‹ " + label
+
 func _build_editor() -> VBoxContainer:
 	var screen := VBoxContainer.new()
 	screen.add_child(_build_header())
@@ -138,7 +143,7 @@ func _build_editor() -> VBoxContainer:
 	var shortcuts := UI.label("Click  Note    Shift-click  Spike    Right-click  Delete    Ctrl-wheel  Zoom", 13, UI.MUTED)
 	shortcuts.size_flags_horizontal = SIZE_EXPAND_FILL
 	footer.add_child(shortcuts)
-	_status = UI.label("", 14, UI.MINT)
+	_status = UI.label("", 14, UI.ACCENT)
 	_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_status.size_flags_horizontal = SIZE_EXPAND_FILL
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -203,7 +208,7 @@ func _build_transport() -> HBoxContainer:
 	_transport_button = UI.button("Play", _toggle_preview)
 	_transport_button.custom_minimum_size.x = 81
 	bar.add_child(_transport_button)
-	_time = UI.label("0:00.000", 19, UI.GOLD)
+	_time = UI.label("0:00.000", 19, UI.ACCENT)
 	_time.custom_minimum_size.x = 100
 	bar.add_child(_time)
 	_bpm = _spin(Chart.MIN_BPM, Chart.MAX_BPM, 0.01, 112)
@@ -392,7 +397,7 @@ func _refresh_actions() -> void:
 
 func _show_status(message: String, error: bool = false) -> void:
 	_status.text = message
-	_status.add_theme_color_override("font_color", UI.RED if error else UI.MINT)
+	_status.add_theme_color_override("font_color", UI.ERROR if error else UI.ACCENT)
 	_status.tooltip_text = message
 
 func _set_dirty() -> void:

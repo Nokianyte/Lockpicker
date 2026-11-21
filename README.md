@@ -23,7 +23,7 @@ Use **+ Zone** to add a zone at the playhead. Click its diamond to open its sett
 
 **Center rotation speed** turns the center polygon, target circle, and incoming polygons together in degrees per second. Positive values turn clockwise and negative values turn counterclockwise. The arena keeps its current angle when a zone changes the speed. Incoming polygons apply their own rotation offset on top.
 
-Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Use the mouse wheel or Left / Right Arrow to turn the innermost ring toward the target circle, then tap **Z** or **X** on the beat. Spikes are spiky circles and cost the same energy as a missed note when their center is inside the target circle on their beat. Saved charts and their audio files stay in local game or browser storage.
+Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Use the mouse wheel or Left / Right Arrow to turn the innermost ring toward the target circle, then tap **Z** or **X** on the beat. Spikes are spiky circles and cost the same energy as a missed note if they line up with the target on their beat. Saved charts and their audio files stay in local game or browser storage.
 
 The center polygon and target circle have black outlines at rest. Both tint yellow for **Perfect** (within 35 ms), green for **Good** (within 70 ms), and red for a miss or spike hit. **OK** hits within the 100 ms window count without a color flash.
 

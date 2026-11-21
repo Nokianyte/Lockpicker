@@ -40,4 +40,4 @@ static func song_marker(radius: float, angle: float) -> Vector2:
 static func song_spike_aligns(angle: float, target_angle: float = T.TIP_ANGLE) -> bool:
 	var target := song_marker(T.SONG_CORE_RADIUS, target_angle)
 	var spike := song_marker(T.SONG_CORE_RADIUS, angle)
-	return spike.distance_squared_to(target) <= T.SONG_MARKER_RADIUS * T.SONG_MARKER_RADIUS
+	return spike.distance_squared_to(target) <= T.SONG_SPIKE_ALIGNMENT_RADIUS * T.SONG_SPIKE_ALIGNMENT_RADIUS

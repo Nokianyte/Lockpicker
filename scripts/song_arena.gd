@@ -6,6 +6,8 @@ const G = preload("res://scripts/wall_geometry.gd")
 const Palette = preload("res://scripts/palette.gd")
 const T = preload("res://scripts/tuning.gd")
 const Session = preload("res://scripts/song_session.gd")
+const MARKER_RADIUS := 27.5
+const MIN_SLIDER_RADIUS := 13.75
 const FLASH_HOLD := 0.12
 const FLASH_DURATION := 0.55
 const JUDGMENT_COLORS := {
@@ -40,6 +42,8 @@ func _draw() -> void:
 	var zoom := minf(size.x, size.y) / (T.OUTER_RADIUS * 2.24)
 	if zoom <= 0.0:
 		return
+	var marker_radius := MARKER_RADIUS * zoom
+	var slider_radius := maxf(MIN_SLIDER_RADIUS, marker_radius)
 	if not _grid.is_empty():
 		draw_multiline(_grid, Palette.BORDER)
 	var schedule := session.events if session != null else events
@@ -58,9 +62,13 @@ func _draw() -> void:
 	# Draw in the same center-relative frame that judging uses.
 	draw_set_transform(size * 0.5, rotation)
 	_draw_core(zoom, target_angle, core_ink, wash_opacity)
+	# Keep approaching markers, especially slider arrows, above the target's fill.
+	var target := G.song_marker(T.SONG_CORE_RADIUS, target_angle) * zoom
+	draw_circle(target, marker_radius, Palette.SURFACE.lerp(core_ink, wash_opacity), true, -1.0, true)
+	draw_arc(target, marker_radius, 0.0, TAU, 40, core_ink.darkened(0.18), 2.0, true)
 	var first := Session.first_event_at(schedule, at - Session.HIT_WINDOW)
 	# The hexagon's nearest edge can reach a corner before any of its vertices enter view.
-	var marker_margin := maxf(8.0, T.SONG_MARKER_RADIUS * 1.35 * zoom) + 2.0
+	var marker_margin := maxf(slider_radius, marker_radius * Art.SPIKE_TIP_SCALE) + 2.0
 	var visible_radius := (size.length() * 0.5 + marker_margin) / (zoom * cos(PI / 6.0))
 	var visible_horizon := (visible_radius - T.SONG_CORE_RADIUS) / Chart.MIN_APPROACH_SPEED
 	var stop := Session.first_event_at(schedule, at + minf(approach_horizon, visible_horizon))
@@ -85,7 +93,7 @@ func _draw() -> void:
 		var visibility := lerpf(1.0, 0.29, approach)
 		if event.spike:
 			Art.ring(self, Vector2.ZERO, zoom, radius, angle, Color(Palette.SPIKE, visibility * 0.33), 1.0)
-			Art.spiky_circle(self, marker, T.SONG_MARKER_RADIUS * zoom, angle, Color(Palette.SPIKE, visibility))
+			Art.spiky_circle(self, marker, marker_radius, angle, Color(Palette.SPIKE, visibility))
 		else:
 			var aligned := absf(remaining) <= Session.HIT_WINDOW and G.gap_accepts_tip(Session.note_target_angle(turns, event, at), angle)
 			var ink := Color(Palette.RED if aligned else Palette.INK, visibility)
@@ -93,15 +101,14 @@ func _draw() -> void:
 			Art.ring(self, Vector2.ZERO, zoom, radius, angle, ink, width)
 			if event.has("slider_direction"):
 				var axis := Vector2(event.slider_direction, 0).rotated(-rotation)
-				Art.slider_marker(self, marker, maxf(5.5, T.SONG_MARKER_RADIUS * zoom), axis, ink, width)
+				draw_circle(marker, slider_radius * 0.82, Color(Palette.SURFACE, visibility), true, -1.0, true)
+				Art.slider_marker(self, marker, slider_radius, axis, ink, maxf(width, slider_radius * 0.18))
 			else:
-				draw_arc(marker, T.SONG_MARKER_RADIUS * zoom, 0.0, TAU, 24, ink, width, true)
-	var marker := G.song_marker(T.SONG_CORE_RADIUS, target_angle) * zoom
-	draw_circle(marker, T.SONG_MARKER_RADIUS * zoom, Palette.SURFACE.lerp(core_ink, wash_opacity), true, -1.0, true)
-	draw_arc(marker, T.SONG_MARKER_RADIUS * zoom, 0.0, TAU, 24, core_ink.darkened(0.18), 2.0, true)
+				draw_arc(marker, marker_radius, 0.0, TAU, 40, ink, width, true)
 	if session != null and session.tint_judgment != Session.Judgment.MISS and age < T.BREAK_TIME:
 		var progress := age / T.BREAK_TIME
-		draw_arc(marker, lerpf(5.0, 22.0, progress), 0.0, TAU, 24, Color(tint, 1.0 - progress), 1.6, true)
+		var pulse_radius := marker_radius * lerpf(0.8, 2.2, progress)
+		draw_arc(target, pulse_radius, 0.0, TAU, 40, Color(tint, 1.0 - progress), 1.6, true)
 
 func _draw_core(zoom: float, target_angle: float, ink: Color, wash_opacity: float) -> void:
 	var points := PackedVector2Array()

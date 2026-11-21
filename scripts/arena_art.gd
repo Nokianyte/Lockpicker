@@ -3,6 +3,7 @@ extends RefCounted
 const T = preload("res://scripts/tuning.gd")
 const G = preload("res://scripts/wall_geometry.gd")
 const Palette = preload("res://scripts/palette.gd")
+const SPIKE_TIP_SCALE := 1.35
 const CORE_BODY := [
 	Vector2(0, -T.TIP_LENGTH), Vector2(23, -64), Vector2(40, -63),
 	Vector2(70, -3), Vector2(38, 50), Vector2(-33, 50),
@@ -32,7 +33,7 @@ static func spiky_circle(canvas: CanvasItem, center: Vector2, radius: float, ang
 	var outline := PackedVector2Array()
 	for point in POINTS:
 		var direction := angle + TAU * point / POINTS
-		var tooth := radius * (1.35 if point % 2 == 0 else 0.72)
+		var tooth := radius * (SPIKE_TIP_SCALE if point % 2 == 0 else 0.72)
 		outline.append(center + Vector2.from_angle(direction) * tooth)
 	canvas.draw_colored_polygon(outline, ink)
 

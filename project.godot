@@ -2,9 +2,9 @@ config_version=5
 
 [application]
 config/name="Lockpicker"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/rhythm.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
-config/description="Rotate the center piece to clear shrinking layers."
+config/description="Turn the inner ring and tap Z or X on beat."
 
 [display]
 window/size/viewport_width=1100

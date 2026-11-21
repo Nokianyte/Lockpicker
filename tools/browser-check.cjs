@@ -42,43 +42,63 @@ const assert = require('node:assert/strict');
     }
     fs.mkdirSync('test-results', { recursive: true });
     const save = label => page.screenshot({ path: `test-results/${engine}-${label}.png` });
-    const score = () => page.screenshot({ clip: { x: 915, y: 50, width: 50, height: 30 } });
-    const core = () => page.screenshot({ clip: { x: 528, y: 329, width: 44, height: 143 } });
-    const clearInput = { button: 'middle' };
+    const score = () => page.screenshot({ clip: { x: 920, y: 18, width: 120, height: 25 } });
+    const center = () => page.screenshot({ clip: { x: 365, y: 265, width: 370, height: 270 } });
+    await canvas.click();
     const zero = await score();
-    // Start, turn, and drop in one sequence. Screenshots can stall the browser
-    // long enough to consume most of the first layer's aiming window.
-    await page.mouse.click(550, 400, clearInput);
-    await page.mouse.wheel(0, 120);
-    await page.waitForTimeout(240);
-    await page.mouse.click(550, 400, clearInput);
-    await page.waitForTimeout(250);
-    const afterClear = await score();
-    await save('layer-cleared');
-    assert.notDeepEqual(afterClear, zero, 'one turn and a click should clear the layer within 250 ms of the click');
-    await canvas.evaluate(element => element.ownerDocument.defaultView.dispatchEvent(new Event('blur')));
-    await page.waitForTimeout(150);
-    await save('paused-refinement');
-    await page.mouse.click(550, 400, clearInput);
-    await page.waitForTimeout(200);
-    assert.deepEqual(await score(), afterClear, 'resume should preserve the score');
 
-    await page.reload({ waitUntil: 'domcontentloaded', timeout: 90000 });
-    await waitForGame();
-    await page.mouse.click(550, 400, clearInput);
-    await page.mouse.click(550, 400, clearInput);
-    await page.waitForTimeout(250);
-    assert.deepEqual(await score(), zero, 'misaligned contact should not score');
-    const gameOver = await core();
-    await save('missed-gap');
-    await page.mouse.click(550, 400, clearInput);
+    const started = Date.now();
+    const waitUntil = elapsed => page.waitForTimeout(Math.max(0, elapsed - (Date.now() - started)));
+    await page.keyboard.press('z');
+    await page.mouse.wheel(0, 120);
+    await waitUntil(1200);
+    await page.keyboard.down('z');
+    await waitUntil(1340);
+    const afterZ = await score();
+    assert.notDeepEqual(afterZ, zero, 'one ring turn and an on-beat Z should score');
+    await save('rhythm-hit');
+
+    await page.mouse.wheel(0, -120);
+    await waitUntil(2400);
+    await page.keyboard.down('x');
+    await page.keyboard.up('z');
+    await waitUntil(2540);
+    const afterX = await score();
+    assert.notDeepEqual(afterX, afterZ, 'an on-beat X should score while Z is held');
+
+    await page.mouse.wheel(0, -120);
+    await waitUntil(3600);
+    await page.keyboard.down('x');
+    await waitUntil(3750);
+    assert.deepEqual(await score(), afterX, 'a repeated keydown should not score');
+    await page.keyboard.up('x');
+    await save('rhythm-miss');
+
+    await canvas.evaluate(element => element.ownerDocument.defaultView.dispatchEvent(new Event('blur')));
+    await page.waitForTimeout(100);
+    const paused = await center();
+    await page.waitForTimeout(200);
+    assert.deepEqual(await center(), paused, 'pause should freeze the chart');
+    await save('rhythm-paused');
+    await page.keyboard.press('z');
+    await page.waitForTimeout(200);
+    assert.notDeepEqual(await center(), paused, 'Z should resume the chart');
+    assert.deepEqual(await score(), afterX, 'resume should preserve the score');
+
+    await page.waitForTimeout(850);
+    const crashed = await center();
+    await page.waitForTimeout(200);
+    assert.deepEqual(await center(), crashed, 'the first unavoided spike should freeze the run');
+    await save('rhythm-spike-hit');
+    await page.keyboard.press('x');
     await page.waitForTimeout(150);
-    assert.notDeepEqual(await core(), gameOver, 'middle click should restart after a miss');
+    assert.deepEqual(await score(), zero, 'X should start a fresh chart after a spike hit');
+
     await page.setViewportSize({ width: 760, height: 600 });
-    await save('refinement-resize');
+    await save('rhythm-resize');
     assert.deepEqual(await page.evaluate(() => [scrollX, scrollY]), [0, 0]);
     assert.deepEqual(errors, []);
-    console.log(`${engine}: rotation, single-click boost, clear, miss, restart, resize and pause/resume passed at ${target}`);
+    console.log(`${engine}: timed Z and X hits, key-repeat suppression, pause, resume, spike crash, retry and resize passed at ${target}`);
   } finally {
     await browser.close();
   }

@@ -1,18 +1,13 @@
-# Lockpicker
+# Lockpicker rhythm prototype
 
-A mouse-wheel arcade game built in **Godot 4.7.2**. Rotate the center polygon so its sharp tip lines up with the opening in the shrinking inner layer.
+Scroll one notch to turn the innermost ring 60°. Line up its circle with the fixed red circle, then tap Z or X when both hexagons overlap on the beat.
 
-**[Play in your browser](https://nokianyte.github.io/Lockpicker/)** · [Source on GitHub](https://github.com/Nokianyte/Lockpicker)
-
-## Controls
-
-- **Scroll:** turn the center polygon by one side (60°) per notch. Scroll down one notch to line up the first layer.
-- **Click the scroll wheel during play:** drop the current inner layer to the tip almost instantly.
-- An aligned layer breaks when it reaches the tip and earns one point. A solid edge hitting the tip ends the run.
-- **Press the scroll wheel:** start, restart, or resume from the corresponding screen.
-- The game pauses when focus is lost. Press the wheel to resume.
-
-Endless layers become faster as the score increases. The best score lasts for the current session. Desktop mouse play is required; touch controls are not included.
+- **Z** and **X** are interchangeable. Either key starts the two-beat count-in, judges a tap during play, and resumes or replays from the corresponding screen. Each tap needs a fresh press.
+- **Perfect** (within 45 ms) earns 100 points. **Good** (within 100 ms) earns 50 points. Both require alignment.
+- A missed ring or an off-beat tap breaks the combo. The rest of the chart continues on schedule.
+- The prototype uses an eight-bar chart and an audible 100 BPM metronome. Watch the opening marker pulse as its ring reaches the tip.
+- Turn spike rings away from the red circle. A spike touching the circle ends the run. Safely passing a spike preserves your combo.
+- Losing window focus pauses the chart.
 
 ## Run locally
 
@@ -29,7 +24,7 @@ godot --headless --path . --editor --import --quit
 godot --headless --path . --script tests/test_game.gd
 ```
 
-The deterministic suite covers turns, gap and solid contact, boosting only the inner layer, pause and restart, and 100 consecutive layer clears at both normal and boosted speed.
+The deterministic suite covers rhythm tap windows, alignment, misses, pause, replay, and a full combo on the prototype chart. It also exercises the original arcade model.
 
 ## Browser export
 
@@ -52,8 +47,10 @@ See [verification notes](docs/verification.md) for the tested build and browser 
 
 ## Project layout
 
-- `scripts/run_model.gd`: gameplay state and simulation.
+- `scripts/rhythm_run.gd`: chart, ring motion, and tap judgment.
+- `scripts/rhythm.gd`: rhythm scene, input, rendering, and metronome.
+- `scripts/run_model.gd`: original arcade simulation.
 - `scripts/wall_geometry.gd`: polygon outline and swept collision.
-- `scripts/main.gd`: rendering, HUD, input, and visual feedback.
+- `scripts/main.gd`: original arcade scene controller.
 - `scripts/tuning.gd`: gameplay constants.
 - `openspec/`: requirements, design decisions, and implementation checklist.

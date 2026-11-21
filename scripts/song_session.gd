@@ -1,5 +1,7 @@
 extends RefCounted
 
+signal penalized
+
 const Chart = preload("res://scripts/song_chart.gd")
 const T = preload("res://scripts/tuning.gd")
 const G = preload("res://scripts/wall_geometry.gd")
@@ -228,3 +230,4 @@ func _penalize(message: String, at: float) -> void:
 	energy = maxi(0, energy - ENERGY_PER_MISTAKE)
 	combo = 0
 	_judge(Judgment.MISS, message, at)
+	penalized.emit()

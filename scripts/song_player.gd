@@ -25,6 +25,7 @@ var _veil: ColorRect
 var _result: Label
 var _summary: Label
 var _continue: Button
+var _penalty_flash := PenaltyFlash.new()
 
 func _ready() -> void:
 	theme = UI.theme()
@@ -67,6 +68,8 @@ func _ready() -> void:
 	_feedback = UI.label("", 18, UI.ACCENT)
 	footer.add_child(_feedback)
 	_build_result()
+	add_child(_penalty_flash)
+	_penalty_flash.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 
 func _build_result() -> void:
 	_veil = ColorRect.new()
@@ -108,9 +111,11 @@ func _restart() -> void:
 	_paused = false
 	_finished = false
 	_veil.hide()
+	_penalty_flash.reset()
 	var start := maxf(transport.playback_start, _cursor - Session.LEAD_IN)
 	session = Session.new()
 	session.setup(_schedule, transport.playback_end, _cursor, start)
+	session.penalized.connect(_penalty_flash.flash)
 	arena.session = session
 	transport.start_at(start)
 	_update_view()
@@ -207,3 +212,40 @@ func _update_view() -> void:
 	_counts.text = "%d hits    %d combo" % [session.hits, session.combo]
 	_energy.value = session.energy
 	_feedback.text = session.feedback if session.time - session.feedback_at < 0.65 else ""
+
+class PenaltyFlash extends Control:
+	const DURATION := 0.55
+	const EDGE_COLOR := Color(Palette.RED, 0.48)
+	const CLEAR_COLOR := Color(Palette.RED, 0.0)
+	var _fade: Tween
+
+	func _ready() -> void:
+		mouse_filter = MOUSE_FILTER_IGNORE
+		modulate.a = 0.0
+		resized.connect(queue_redraw)
+
+	func reset() -> void:
+		if _fade != null:
+			_fade.kill()
+			_fade = null
+		modulate.a = 0.0
+
+	func flash() -> void:
+		reset()
+		modulate.a = 1.0
+		_fade = create_tween()
+		_fade.tween_property(self, "modulate:a", 0.0, DURATION).set_trans(Tween.TRANS_SINE)
+
+	func _draw() -> void:
+		var inset := minf(size.x, size.y) * 0.085
+		if inset <= 0.0:
+			return
+		var outer := PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0.0), size, Vector2(0.0, size.y)])
+		var inner := PackedVector2Array([
+			Vector2(inset, inset), Vector2(size.x - inset, inset),
+			size - Vector2(inset, inset), Vector2(inset, size.y - inset),
+		])
+		var colors := PackedColorArray([EDGE_COLOR, EDGE_COLOR, CLEAR_COLOR, CLEAR_COLOR])
+		for side in 4:
+			var next := (side + 1) % 4
+			draw_polygon(PackedVector2Array([outer[side], outer[next], inner[next], inner[side]]), colors)

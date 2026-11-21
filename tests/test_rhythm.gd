@@ -83,6 +83,8 @@ func _check_hit_bindings() -> void:
 
 func _check_judgment_tints() -> void:
 	var model := _session([_event(1.0), _event(2.0), _event(2.3), _event(4.0), _event(4.5, 0, true)])
+	var penalties: Array[bool] = []
+	model.penalized.connect(func() -> void: penalties.append(true))
 	model.press(0.8)
 	_check(model.tint_judgment == Session.Judgment.NONE, "An off-beat press must leave the center at its idle color.")
 	model.press(1.035)
@@ -93,10 +95,12 @@ func _check_judgment_tints() -> void:
 	_check(model.tint_judgment == Session.Judgment.GOOD and model.feedback == "Good · Late", "A hit at the Good boundary must trigger the Good tint.")
 	model.press(2.21)
 	_check(model.tint_judgment == Session.Judgment.GOOD and model.tint_at == 2.07 and model.feedback == "OK · Early" and model.hits == 3, "An OK hit must count without starting a new tint or interrupting the last one.")
+	_check(penalties.is_empty(), "Hits and invalid presses must not trigger the penalty flash.")
 	model.advance_to(4.11)
 	_check(model.tint_judgment == Session.Judgment.MISS and model.tint_at == 4.1 and model.feedback == "Miss", "A missed note must trigger the Miss tint at the deadline.")
 	model.advance_to(4.5)
 	_check(model.tint_judgment == Session.Judgment.MISS and model.tint_at == 4.5 and model.feedback == "Spike", "A spike hit must trigger the Miss tint.")
+	_check(penalties.size() == 2, "Each miss and spike hit must trigger one penalty flash.")
 
 func _check_sliders() -> void:
 	var right := _event(1.0)

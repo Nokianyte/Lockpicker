@@ -8,7 +8,6 @@ const SPIKE := Color("a84b24")
 const SONG_CORE := Color("111111")
 const PERFECT := Color("ffd447")
 const GOOD := Color("56bb78")
-const OK := Color("e8d488")
 
 const SURFACE := Color("fffdf9")
 const PANEL := Color("f1ede7")

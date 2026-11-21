@@ -27,8 +27,8 @@ var time := 0.0
 var duration := 0.0
 var feedback := ""
 var feedback_at := -INF
-var judgment := Judgment.NONE
-var judgment_at := -INF
+var tint_judgment := Judgment.NONE
+var tint_at := -INF
 
 var _deadline_order: Array[int] = []
 var _deadline_cursor := 0
@@ -219,8 +219,9 @@ func _feedback(message: String, at: float) -> void:
 	feedback_at = at
 
 func _judge(result: Judgment, message: String, at: float) -> void:
-	judgment = result
-	judgment_at = at
+	if result != Judgment.OK:
+		tint_judgment = result
+		tint_at = at
 	_feedback(message, at)
 
 func _penalize(message: String, at: float) -> void:

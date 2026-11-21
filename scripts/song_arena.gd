@@ -6,10 +6,11 @@ const G = preload("res://scripts/wall_geometry.gd")
 const Palette = preload("res://scripts/palette.gd")
 const T = preload("res://scripts/tuning.gd")
 const Session = preload("res://scripts/song_session.gd")
+const FLASH_HOLD := 0.12
+const FLASH_DURATION := 0.55
 const JUDGMENT_COLORS := {
 	Session.Judgment.PERFECT: Palette.PERFECT,
 	Session.Judgment.GOOD: Palette.GOOD,
-	Session.Judgment.OK: Palette.OK,
 	Session.Judgment.MISS: Palette.RED,
 }
 
@@ -49,12 +50,14 @@ func _draw() -> void:
 	var tint := Palette.SONG_CORE
 	var age := INF
 	if session != null:
-		tint = JUDGMENT_COLORS.get(session.judgment, Palette.SONG_CORE)
-		age = at - session.judgment_at
-	var flash := 1.0 - smoothstep(0.07, 0.28, age)
+		tint = JUDGMENT_COLORS.get(session.tint_judgment, Palette.SONG_CORE)
+		age = at - session.tint_at
+	var flash := 1.0 - smoothstep(FLASH_HOLD, FLASH_DURATION, age)
+	var core_ink := Palette.SONG_CORE.lerp(tint, flash)
+	var wash_opacity := lerpf(0.055, 0.14, flash)
 	# Draw in the same center-relative frame that judging uses.
 	draw_set_transform(size * 0.5, rotation)
-	_draw_core(zoom, target_angle, Palette.SONG_CORE.lerp(tint, flash), lerpf(0.055, 0.14, flash))
+	_draw_core(zoom, target_angle, core_ink, wash_opacity)
 	var first := Session.first_event_at(schedule, at - Session.HIT_WINDOW)
 	# The hexagon's nearest edge can reach a corner before any of its vertices enter view.
 	var marker_margin := maxf(8.0, T.SONG_MARKER_RADIUS * 1.35 * zoom) + 2.0
@@ -94,9 +97,9 @@ func _draw() -> void:
 			else:
 				draw_arc(marker, T.SONG_MARKER_RADIUS * zoom, 0.0, TAU, 24, ink, width, true)
 	var marker := G.song_marker(T.SONG_CORE_RADIUS, target_angle) * zoom
-	draw_circle(marker, T.SONG_MARKER_RADIUS * zoom, Palette.RED_WASH, true, -1.0, true)
-	draw_arc(marker, T.SONG_MARKER_RADIUS * zoom, 0.0, TAU, 24, Palette.RED, 2.0, true)
-	if session != null and session.judgment != Session.Judgment.MISS and age < T.BREAK_TIME:
+	draw_circle(marker, T.SONG_MARKER_RADIUS * zoom, Palette.SURFACE.lerp(core_ink, wash_opacity), true, -1.0, true)
+	draw_arc(marker, T.SONG_MARKER_RADIUS * zoom, 0.0, TAU, 24, core_ink.darkened(0.18), 2.0, true)
+	if session != null and session.tint_judgment != Session.Judgment.MISS and age < T.BREAK_TIME:
 		var progress := age / T.BREAK_TIME
 		draw_arc(marker, lerpf(5.0, 22.0, progress), 0.0, TAU, 24, Color(tint, 1.0 - progress), 1.6, true)
 

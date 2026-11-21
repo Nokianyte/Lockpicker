@@ -15,17 +15,17 @@ Scroll one notch or press the Left or Right Arrow to turn the innermost ring 60�
 
 Open **Charts → New chart** and import an MP3 or WAV file. Set the BPM and first-beat offset against the waveform, then choose a grid subdivision. Left-click a lane to place a note, Shift + left-click to place a spike, and right-click a marker to delete it. Drag a marker to move it. Use the wheel to scroll the timeline and Ctrl + wheel to zoom.
 
-Choose **Left slider** or **Right slider** from the placement menu below the grid, then click a lane to place it. Each slider rotates the center and target 60° on its beat, even if you miss it. Aim at the red circle and press the matching arrow to score the hit. The wheel still turns the incoming ring, and the arrows also turn it outside slider hit windows. Preview and cursor playtests use the same scheduled turns.
+Choose **Left slider** or **Right slider** from the placement menu below the grid, then click a lane to place it. Each slider rotates the center and target 60° on its beat, even if you miss it. Aim at the target circle and press the matching arrow to score the hit. The wheel still turns the incoming ring, and the arrows also turn it outside slider hit windows. Preview and cursor playtests use the same scheduled turns.
 
 In **Info / Settings**, set **Start offset** and **End offset** to skip seconds from either end of the song. The grid stays aligned to the original recording, with trimmed sections shaded on the timeline.
 
 Use **+ Zone** to add a zone at the playhead. Click its diamond to open its settings or drag the diamond to move the start. Each zone applies through the next marker or the end of the chart. **Spawn distance** sets the starting radius, up to 3,000 units for entrances from offscreen. **Start speed** and **End speed** set each polygon’s approach speeds in units per second. The **Rotation offset** winds back to the charted direction with the same speed change. Polygons still arrive on beat.
 
-**Center rotation speed** turns the center polygon, red target, and incoming polygons together in degrees per second. Positive values turn clockwise and negative values turn counterclockwise. The arena keeps its current angle when a zone changes the speed. Incoming polygons apply their own rotation offset on top.
+**Center rotation speed** turns the center polygon, target circle, and incoming polygons together in degrees per second. Positive values turn clockwise and negative values turn counterclockwise. The arena keeps its current angle when a zone changes the speed. Incoming polygons apply their own rotation offset on top.
 
-Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Use the mouse wheel or Left / Right Arrow to turn the innermost ring toward the red circle, then tap **Z** or **X** on the beat. Spikes are spiky circles and cost the same energy as a missed note when their center is inside the red circle on their beat. Saved charts and their audio files stay in local game or browser storage.
+Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Use the mouse wheel or Left / Right Arrow to turn the innermost ring toward the target circle, then tap **Z** or **X** on the beat. Spikes are spiky circles and cost the same energy as a missed note when their center is inside the target circle on their beat. Saved charts and their audio files stay in local game or browser storage.
 
-The center has a black outline and a light wash between judgments. Both tint bright yellow for **Perfect** (within 35 ms), green for **Good** (within 70 ms), soft yellow for **OK** (within 100 ms), and red for a miss or spike hit.
+The center polygon and target circle have black outlines at rest. Both tint yellow for **Perfect** (within 35 ms), green for **Good** (within 70 ms), and red for a miss or spike hit. **OK** hits within the 100 ms window count without a color flash.
 
 ## Run locally
 

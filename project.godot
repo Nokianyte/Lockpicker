@@ -11,6 +11,13 @@ window/size/viewport_width=1100
 window/size/viewport_height=800
 window/stretch/mode="canvas_items"
 
+[input]
+
+song_hit={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"physical_keycode":32)]
+}
+
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"

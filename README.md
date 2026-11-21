@@ -14,6 +14,12 @@ A mouse-wheel arcade game built in **Godot 4.7.2**. Rotate the center polygon so
 
 Endless layers become faster as the score increases. The best score lasts for the current session. Desktop mouse play is required; touch controls are not included.
 
+## Make a song chart
+
+Open **Charts → New chart** and import a WAV file. Set the BPM and first-beat offset against the waveform, then choose a grid subdivision. Left-click a lane to place a note, Shift + left-click to place a spike, and right-click a marker to delete it. Drag a marker to move it. Use the wheel to scroll the timeline and Ctrl + wheel to zoom.
+
+Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Turn with the mouse wheel and press Space to hit aligned notes. A spike costs the same energy as a miss if you aim at it on its beat. Saved charts and their WAV files stay in local game or browser storage.
+
 ## Run locally
 
 Install the standard (GDScript) Godot **4.7.2** editor. Import `project.godot`, then press F5 to run the main scene. Or, with the executable on PATH:
@@ -27,6 +33,7 @@ godot --path .
 ```sh
 godot --headless --path . --editor --import --quit
 godot --headless --path . --script tests/test_game.gd
+godot --headless --path . --script tests/test_rhythm.gd
 ```
 
 The deterministic suite covers turns, gap and solid contact, boosting only the inner layer, pause and restart, and 100 consecutive layer clears at both normal and boosted speed.

@@ -69,8 +69,7 @@ func _set_layer_pace() -> void:
 	shrink_speed = (wall.radius - contact_radius) / aim_time
 
 func _turn_angle(seconds: float) -> float:
-	var progress := minf(seconds / T.TURN_DURATION, 1.0)
-	return lerpf(turn_from, turn_target, smoothstep(0.0, 1.0, progress))
+	return G.turn_angle(turn_from, turn_target, seconds)
 
 func step(dt: float) -> void:
 	var remaining := dt

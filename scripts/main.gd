@@ -3,16 +3,12 @@ extends Node2D
 const Model = preload("res://scripts/run_model.gd")
 const T = preload("res://scripts/tuning.gd")
 const G = preload("res://scripts/wall_geometry.gd")
+const Art = preload("res://scripts/arena_art.gd")
 const INK := Color("e8f3ee")
 const MINT := Color("9cfdc2")
 const MUTED := Color("71848e")
 const RED := Color("ff886e")
 const GOLD := Color("ffd17e")
-const CORE_BODY := [
-	Vector2(0, -T.TIP_LENGTH), Vector2(23, -64), Vector2(40, -63),
-	Vector2(70, -3), Vector2(38, 50), Vector2(-33, 50),
-	Vector2(-69, -1), Vector2(-36, -61), Vector2(-22, -64),
-]
 var game = Model.new()
 var font: Font = ThemeDB.fallback_font
 var effects: Array = []
@@ -22,13 +18,10 @@ var best := 0
 
 func _ready() -> void:
 	DisplayServer.window_set_title("Lockpicker")
-	if OS.has_feature("web"):
-		JavaScriptBridge.eval("window.lockpickerBlurred=false;window.addEventListener('blur',()=>window.lockpickerBlurred=true);document.addEventListener('visibilitychange',()=>{if(document.hidden)window.lockpickerBlurred=true;});")
 
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-		game.pause()
-		middle_down = false
+func pause_run() -> void:
+	game.pause()
+	middle_down = false
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -55,10 +48,6 @@ func _physics_process(delta: float) -> void:
 	game.cleared.clear()
 
 func _process(delta: float) -> void:
-	if OS.has_feature("web") and JavaScriptBridge.eval("window.lockpickerBlurred === true"):
-		game.pause()
-		middle_down = false
-		JavaScriptBridge.eval("window.lockpickerBlurred=false;")
 	clock += delta
 	if not game.paused:
 		for effect in effects:
@@ -73,21 +62,6 @@ func text(value: String, at: Vector2, size: int, color: Color = INK) -> void:
 
 func centered(value: String, y: float, size: int, color: Color = INK) -> void:
 	text(value, Vector2((get_viewport_rect().size.x - font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x) / 2.0, y), size, color)
-
-func draw_core(center: Vector2, zoom: float, aligned: bool) -> void:
-	var rotation: float = game.tip_angle - T.TIP_ANGLE
-	var points := PackedVector2Array()
-	for point: Vector2 in CORE_BODY:
-		points.append(center + point.rotated(rotation) * zoom)
-	draw_colored_polygon(points, Color("362327"))
-	var tip := points[0]
-	var shoulder_a := points[1]
-	var shoulder_b := points[-1]
-	var tip_color := MINT if aligned else GOLD
-	draw_colored_polygon(PackedVector2Array([tip, shoulder_a, shoulder_b]), Color(tip_color, 0.24))
-	points.append(tip)
-	draw_polyline(points, RED, 2.5, true)
-	draw_polyline(PackedVector2Array([shoulder_b, tip, shoulder_a]), tip_color, 3.0, true)
 
 func _draw() -> void:
 	var size := get_viewport_rect().size
@@ -119,7 +93,7 @@ func _draw() -> void:
 				draw_circle(origin + G.point(wall.radius, wall.angle, angle) * zoom, 3.5, INK)
 	for effect in effects:
 		draw_line(origin + effect.a * zoom, origin + effect.b * zoom, Color(MINT, effect.life / T.BREAK_TIME), 2, true)
-	draw_core(origin, zoom, aligned)
+	Art.core(self, origin, zoom, game.tip_angle, aligned)
 	var footer_y := size.y - 52
 	# Keep outlines out of the HUD.
 	draw_rect(Rect2(0, 0, size.x, 99), Color("06090f"))

@@ -2,6 +2,10 @@ extends RefCounted
 
 const T = preload("res://scripts/tuning.gd")
 
+static func turn_angle(from: float, target: float, seconds: float) -> float:
+	var progress := clampf(seconds / T.TURN_DURATION, 0.0, 1.0)
+	return lerpf(from, target, smoothstep(0.0, 1.0, progress))
+
 static func point(radius: float, rotation: float, angle: float) -> Vector2:
 	# Intersect a ray with a regular hexagon. Gap and collision use the same outline.
 	var sector := PI / 3.0

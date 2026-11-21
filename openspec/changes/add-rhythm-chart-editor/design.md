@@ -24,7 +24,7 @@ Use the audio playback position to drive event approach, preview, and judging. N
 
 ### Judge turns and hits at their actual times
 
-Default the left-hand hit action to Space and use the existing wheel turn on the right. Each fresh keypress evaluates the nearest unresolved note whose timing window contains the press, with the earlier note taking precedence on a tie. Judge the animated tip angle at that timestamp. An invalid press leaves the note eligible until its window closes. Check the animated tip angle at the charted beat for each spike and record each outcome once. A simultaneous spike and note in different directions require independent checks.
+Use Z and X for the hit action. The mouse wheel and Left / Right Arrow turn the innermost pending layer by 60 degrees per input. Events on that beat share the layer's rotation. When they resolve, the next layer starts in its charted orientation. Each fresh keypress evaluates the nearest unresolved note whose timing window contains the press, with the earlier note taking precedence on a tie. Compare its animated ring angle with the fixed top marker at the press timestamp. An invalid press leaves the note eligible until its window closes. Check each spike against the same marker at its charted beat and record each outcome once.
 
 Share one tuning definition for the timing window, energy restored on success, and energy lost on either a miss or spike hit. Keep a combo and energy counter in the song session. Pause audio and judgment together on loss of focus and resume with a fresh player action.
 

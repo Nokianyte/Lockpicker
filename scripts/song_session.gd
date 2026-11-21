@@ -23,12 +23,13 @@ var time := 0.0
 var duration := 0.0
 var feedback := ""
 var feedback_at := -INF
-var last_hit: Dictionary = {}
+var last_hit_at := -INF
 
 var _deadline_order: Array[int] = []
 var _deadline_cursor := 0
-var _turn_from := T.TIP_ANGLE
-var _turn_target := T.TIP_ANGLE
+var _inner := 0
+var _turn_from := 0.0
+var _turn_target := 0.0
 var _turn_started := -INF
 
 func setup(schedule: Array[Dictionary], length: float, cursor: float, start: float) -> void:
@@ -47,12 +48,16 @@ func setup(schedule: Array[Dictionary], length: float, cursor: float, start: flo
 		return left < right
 	)
 
-func tip_angle(at: float) -> float:
-	return wrapf(G.turn_angle(_turn_from, _turn_target, at - _turn_started), -PI, PI)
+func ring_angle(index: int, at: float) -> float:
+	var event := events[index]
+	var angle := Chart.direction_angle(event.lane)
+	if _inner < events.size() and event.time == events[_inner].time:
+		angle += G.turn_angle(_turn_from, _turn_target, at - _turn_started)
+	return angle
 
 func rotate(direction: float, at: float) -> void:
 	advance_to(at)
-	if energy == 0:
+	if energy == 0 or _inner >= events.size():
 		return
 	var current := G.turn_angle(_turn_from, _turn_target, time - _turn_started)
 	if time - _turn_started >= T.TURN_DURATION:
@@ -73,14 +78,14 @@ func advance_to(at: float, finishing: bool = false) -> void:
 		_deadline_cursor += 1
 		if resolved[index]:
 			continue
-		resolved[index] = 1
 		if event.spike:
-			if G.gap_accepts_tip(tip_angle(event.time), Chart.direction_angle(event.lane)):
+			if G.gap_accepts_tip(T.TIP_ANGLE, ring_angle(index, event.time)):
 				spike_hits += 1
 				_penalize("Spike", deadline)
 		else:
 			misses += 1
 			_penalize("Miss", deadline)
+		_resolve(index)
 
 func press(at: float) -> void:
 	advance_to(at)
@@ -100,14 +105,14 @@ func press(at: float) -> void:
 		_feedback("Off beat", time)
 		return
 	var note := events[best]
-	if not G.gap_accepts_tip(tip_angle(time), Chart.direction_angle(note.lane)):
+	if not G.gap_accepts_tip(T.TIP_ANGLE, ring_angle(best, time)):
 		_feedback("Wrong direction", time)
 		return
-	resolved[best] = 1
+	_resolve(best)
 	hits += 1
 	combo += 1
 	energy = mini(MAX_ENERGY, energy + ENERGY_PER_HIT)
-	last_hit = {"lane": note.lane, "at": time}
+	last_hit_at = time
 	var timing := time - float(note.time)
 	if absf(timing) <= 0.035:
 		_feedback("On beat", time)
@@ -124,6 +129,19 @@ static func first_event_at(schedule: Array[Dictionary], at: float) -> int:
 		else:
 			high = middle
 	return low
+
+func _resolve(index: int) -> void:
+	resolved[index] = 1
+	if index != _inner:
+		return
+	var previous_beat: float = events[_inner].time
+	while _inner < events.size() and resolved[_inner]:
+		_inner += 1
+	# Markers at the same beat share the current layer's rotation.
+	if _inner == events.size() or events[_inner].time != previous_beat:
+		_turn_from = 0.0
+		_turn_target = 0.0
+		_turn_started = -INF
 
 func _deadline(index: int) -> float:
 	var event := events[index]

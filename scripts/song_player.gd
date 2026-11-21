@@ -62,7 +62,7 @@ func _ready() -> void:
 	stage.add_child(arena)
 	var footer := HBoxContainer.new()
 	content.add_child(footer)
-	var instructions := UI.label("Wheel  Aim      Space  Hit      Esc  Back", 15, UI.MUTED)
+	var instructions := UI.label("Wheel or Left / Right Arrow  Turn ring      Z / X  Tap      Esc  Back", 15, UI.MUTED)
 	instructions.size_flags_horizontal = SIZE_EXPAND_FILL
 	footer.add_child(instructions)
 	_feedback = UI.label("", 18, UI.ACCENT)
@@ -109,6 +109,7 @@ func _restart() -> void:
 	var start := maxf(0.0, _cursor - Session.LEAD_IN)
 	session = Session.new()
 	session.setup(_schedule, transport.duration(), _cursor, start)
+	arena.session = session
 	transport.start_at(start)
 	_update_view()
 
@@ -123,21 +124,35 @@ func _process(_delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or session == null:
 		return
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ESCAPE:
+	if event is InputEventKey:
+		_key_input(event)
+	elif event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		get_viewport().set_input_as_handled()
+		_turn(-1.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0)
+
+func _key_input(event: InputEventKey) -> void:
+	if event.keycode not in [KEY_ESCAPE, KEY_LEFT, KEY_RIGHT] and not event.is_action("song_hit"):
+		return
+	get_viewport().set_input_as_handled()
+	if not event.pressed or event.echo:
+		return
+	match event.keycode:
+		KEY_ESCAPE:
 			_leave()
-			get_viewport().set_input_as_handled()
-		elif event.is_action_pressed("song_hit"):
-			if _paused:
+		KEY_LEFT:
+			_turn(-1.0)
+		KEY_RIGHT:
+			_turn(1.0)
+		_:
+			if _paused or _finished:
 				_continue_run()
-			elif not _finished:
+			else:
 				session.press(transport.song_time())
 				_update_view()
-			get_viewport().set_input_as_handled()
-	elif event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-		if not _paused and not _finished:
-			session.rotate(-1.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0, transport.song_time())
-		get_viewport().set_input_as_handled()
+
+func _turn(direction: float) -> void:
+	if not _paused and not _finished:
+		session.rotate(direction, transport.song_time())
 
 func pause_run() -> void:
 	if not is_visible_in_tree() or session == null or _paused or _finished:
@@ -150,7 +165,7 @@ func pause_run() -> void:
 		return
 	_paused = true
 	_result.text = "Paused"
-	_summary.text = "Press Space or Resume to continue."
+	_summary.text = "Press Z or X to resume."
 	_continue.text = "Resume"
 	_veil.show()
 
@@ -181,11 +196,6 @@ func _leave() -> void:
 	exit_requested.emit()
 
 func _update_view() -> void:
-	arena.events = session.events
-	arena.resolved = session.resolved
-	arena.song_time = session.time
-	arena.heading = session.tip_angle(session.time)
-	arena.last_hit = session.last_hit
 	arena.queue_redraw()
 	_counts.text = "%d hits    %d combo" % [session.hits, session.combo]
 	_energy.value = session.energy

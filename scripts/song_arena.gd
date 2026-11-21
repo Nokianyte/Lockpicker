@@ -12,10 +12,8 @@ const SPIKE_DEPTH := 18.0
 const SPIKE_CONTACT_RADIUS := CORE_RADIUS + (MARKER_RADIUS + SPIKE_DEPTH) / cos(PI / 6.0)
 
 var events: Array[Dictionary] = []
-var resolved := PackedByteArray()
 var song_time := 0.0
-var heading := T.TIP_ANGLE
-var last_hit: Dictionary = {}
+var session: Session
 var _grid := PackedVector2Array()
 
 func _ready() -> void:
@@ -39,17 +37,18 @@ func _draw() -> void:
 	if not _grid.is_empty():
 		draw_multiline(_grid, Palette.BORDER)
 	_draw_core(center, zoom)
-	var first := Session.first_event_at(events, song_time - Session.HIT_WINDOW)
-	var stop := Session.first_event_at(events, song_time + Session.APPROACH)
-	var aligned := false
+	var schedule := session.events if session != null else events
+	var at := session.time if session != null else song_time
+	var first := Session.first_event_at(schedule, at - Session.HIT_WINDOW)
+	var stop := Session.first_event_at(schedule, at + Session.APPROACH)
 	for index in range(stop - 1, first - 1, -1):
-		if index < resolved.size() and resolved[index]:
+		if session != null and session.resolved[index]:
 			continue
-		var event := events[index]
-		var remaining := float(event.time) - song_time
+		var event := schedule[index]
+		var remaining := float(event.time) - at
 		if event.spike and remaining < 0.0:
 			continue
-		var angle := Chart.direction_angle(event.lane)
+		var angle := session.ring_angle(index, at) if session != null else Chart.direction_angle(event.lane)
 		var approach := clampf(remaining / Session.APPROACH, 0.0, 1.0)
 		var arrival_radius := SPIKE_CONTACT_RADIUS if event.spike else CORE_RADIUS
 		var radius := lerpf(arrival_radius, T.OUTER_RADIUS, approach)
@@ -58,23 +57,19 @@ func _draw() -> void:
 			Art.ring(self, center, zoom, radius, angle, Color(Palette.SPIKE, visibility * 0.33), 1.0)
 			_draw_spike(center, zoom, radius, angle, Color(Palette.SPIKE, visibility))
 		else:
-			var ink := Color(Palette.INK, visibility)
+			var aligned := absf(remaining) <= Session.HIT_WINDOW and G.gap_accepts_tip(T.TIP_ANGLE, angle)
+			var ink := Color(Palette.RED if aligned else Palette.INK, visibility)
 			var width := lerpf(2.3, 1.0, approach)
 			Art.ring(self, center, zoom, radius, angle, ink, width)
 			var marker := center + G.point(radius, angle, angle) * zoom
 			draw_arc(marker, MARKER_RADIUS * zoom, 0.0, TAU, 24, ink, width, true)
-			if absf(remaining) <= Session.HIT_WINDOW and G.gap_accepts_tip(heading, angle):
-				aligned = true
-	var aim := center + G.point(CORE_RADIUS, T.TIP_ANGLE, heading) * zoom
-	var aim_ink := Palette.RED if aligned else Palette.MUTED
-	draw_circle(aim, MARKER_RADIUS * zoom, Palette.RED_WASH, true, -1.0, true)
-	draw_arc(aim, MARKER_RADIUS * zoom, 0.0, TAU, 24, aim_ink, 2.0, true)
-	if not last_hit.is_empty():
-		var age := (song_time - float(last_hit.at)) / T.BREAK_TIME
+	var marker := center + G.point(CORE_RADIUS, T.TIP_ANGLE, T.TIP_ANGLE) * zoom
+	draw_circle(marker, MARKER_RADIUS * zoom, Palette.RED_WASH, true, -1.0, true)
+	draw_arc(marker, MARKER_RADIUS * zoom, 0.0, TAU, 24, Palette.RED, 2.0, true)
+	if session != null:
+		var age := (at - session.last_hit_at) / T.BREAK_TIME
 		if age >= 0.0 and age < 1.0:
-			var angle := Chart.direction_angle(last_hit.lane)
-			var point := center + G.point(CORE_RADIUS, T.TIP_ANGLE, angle) * zoom
-			draw_arc(point, lerpf(5.0, 22.0, age), 0.0, TAU, 24, Color(Palette.RED, 1.0 - age), 1.6, true)
+			draw_arc(marker, lerpf(5.0, 22.0, age), 0.0, TAU, 24, Color(Palette.RED, 1.0 - age), 1.6, true)
 
 func _draw_core(center: Vector2, zoom: float) -> void:
 	var points := PackedVector2Array()

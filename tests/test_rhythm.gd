@@ -4,6 +4,7 @@ const AppScene = preload("res://scenes/main.tscn")
 const Chart = preload("res://scripts/song_chart.gd")
 const Library = preload("res://scripts/chart_library.gd")
 const Session = preload("res://scripts/song_session.gd")
+const T = preload("res://scripts/tuning.gd")
 
 var _checks := 0
 var _failed := 0
@@ -48,9 +49,19 @@ func _check_judgment() -> void:
 	model.advance_to(1.05)
 	_check(model.spike_hits == 1 and model.resolved[1] == 0, "A spike must resolve once while a simultaneous note remains eligible.")
 	model = _session([_event(1.0, 0, true), _event(1.0, 1)])
-	model.rotate(1.0, 0.77)
+	model.rotate(-1.0, 0.77)
 	model.press(1.0)
-	_check(model.spike_hits == 0 and model.hits == 1, "Turning to another lane in time must allow a dodge and a simultaneous hit.")
+	_check(model.spike_hits == 0 and model.hits == 1, "Turning the layer in time must allow a dodge and a simultaneous hit.")
+
+	model = _session([_event(1.0, 1), _event(1.0, 2, true), _event(1.4, 4)])
+	model.rotate(-1.0, 0.7)
+	_check(is_equal_approx(model.ring_angle(0, 0.7 + T.TURN_DURATION / 2.0), Chart.direction_angle(1) - T.WHEEL_STEP / 2.0), "The inner note must turn smoothly.")
+	_check(is_equal_approx(model.ring_angle(1, 1.0), Chart.direction_angle(1)), "A spike on the same beat must turn with the active note.")
+	_check(is_equal_approx(model.ring_angle(2, 1.0), Chart.direction_angle(4)), "An outer layer must keep its charted orientation during a turn.")
+	model.press(0.95)
+	model.advance_to(1.0)
+	_check(model.hits == 1 and model.spike_hits == 0, "The layer must retain its turn through an early note hit while its spike is pending.")
+	_check(is_equal_approx(model.ring_angle(2, 1.0), Chart.direction_angle(4)), "A newly active layer must start in its charted orientation.")
 
 	model = _session([_event(0.7, 0, true), _event(1.0)], 1.0)
 	model.press(0.95)
@@ -58,6 +69,16 @@ func _check_judgment() -> void:
 	model = _session([_event(0.0, 0, true), _event(0.25), _event(0.5), _event(0.75), _event(1.0), _event(1.25), _event(1.5), _event(1.75)])
 	model.advance_to(2.0)
 	_check(model.energy == 0 and model.misses == 6, "Zero energy must end judgment.")
+
+func _check_hit_bindings() -> void:
+	var event := InputEventKey.new()
+	event.pressed = true
+	event.keycode = KEY_Z
+	_check(event.is_action_pressed("song_hit"), "Z must trigger a song hit.")
+	event.keycode = KEY_X
+	_check(event.is_action_pressed("song_hit"), "X must trigger a song hit.")
+	event.keycode = KEY_SPACE
+	_check(not event.is_action_pressed("song_hit"), "Space must not trigger a song hit.")
 
 func _wav() -> PackedByteArray:
 	var format := AudioStreamWAV.new()
@@ -159,6 +180,7 @@ func _check_storage(library: Library, arguments: PackedStringArray, wav: PackedB
 
 func _run() -> void:
 	_check_judgment()
+	_check_hit_bindings()
 	var app := AppScene.instantiate()
 	root.add_child(app)
 	var arguments := OS.get_cmdline_user_args()

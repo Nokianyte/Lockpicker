@@ -6,7 +6,7 @@ Lockpicker currently generates an endless sequence of layers. An in-game editor 
 
 - Add a local chart library and an editor with a six-direction timeline, an arena preview, and the song waveform behind the grid.
 - Add song import, BPM and first-beat alignment, grid snapping, direct mouse shortcuts for notes and spikes, and saving and reopening charts.
-- Add whole-song and cursor-based playtesting. In song play, the right hand turns with the mouse wheel and the left hand presses a hit key. Spikes check aim on their beat and carry the same penalty as a missed note.
+- Add whole-song and cursor-based playtesting. In song play, the mouse wheel or Left / Right Arrow turns the innermost layer around a fixed center. Z and X handle timed hits. Spikes check alignment on their beat and carry the same penalty as a missed note.
 - Use the supplied layout sketch as the first pass. The top bar and Info / Settings panel can be rearranged as the authoring workflow evolves.
 
 ## Capabilities

@@ -15,7 +15,7 @@ Scroll one notch or press the Left or Right Arrow to turn the innermost ring 60Â
 
 Open **Charts â†’ New chart** and import an MP3 or WAV file. Set the BPM and first-beat offset against the waveform, then choose a grid subdivision. Left-click a lane to place a note, Shift + left-click to place a spike, and right-click a marker to delete it. Drag a marker to move it. Use the wheel to scroll the timeline and Ctrl + wheel to zoom.
 
-Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Turn with the mouse wheel and press Space to hit aligned notes. A spike costs the same energy as a miss if you aim at it on its beat. Saved charts and their audio files stay in local game or browser storage.
+Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Use the mouse wheel or Left / Right Arrow to turn the innermost ring toward the fixed red circle, then tap **Z** or **X** on the beat. A spike costs the same energy as a missed note if it lines up with the circle on its beat. Saved charts and their audio files stay in local game or browser storage.
 
 ## Run locally
 

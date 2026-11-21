@@ -15,7 +15,7 @@ window/stretch/mode="canvas_items"
 
 song_hit={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"physical_keycode":32)]
+"events": [Object(InputEventKey,"keycode":90), Object(InputEventKey,"keycode":88)]
 }
 
 [rendering]

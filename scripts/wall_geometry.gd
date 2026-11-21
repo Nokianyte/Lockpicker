@@ -37,7 +37,7 @@ static func gap_accepts_tip(tip_angle: float, gap_angle: float) -> bool:
 static func song_marker(radius: float, angle: float) -> Vector2:
 	return point(radius, angle, angle)
 
-static func song_spike_aligns(angle: float) -> bool:
-	var target := song_marker(T.SONG_CORE_RADIUS, T.TIP_ANGLE)
+static func song_spike_aligns(angle: float, target_angle: float = T.TIP_ANGLE) -> bool:
+	var target := song_marker(T.SONG_CORE_RADIUS, target_angle)
 	var spike := song_marker(T.SONG_CORE_RADIUS, angle)
 	return spike.distance_squared_to(target) <= T.SONG_MARKER_RADIUS * T.SONG_MARKER_RADIUS

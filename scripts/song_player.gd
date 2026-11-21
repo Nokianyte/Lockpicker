@@ -61,7 +61,7 @@ func _ready() -> void:
 	stage.add_child(arena)
 	var footer := HBoxContainer.new()
 	content.add_child(footer)
-	var instructions := UI.label("Wheel or Left / Right Arrow  Turn ring      Z / X  Tap      Esc  Back", 15, UI.MUTED)
+	var instructions := UI.label("Wheel or arrows  Aim    Z / X  Tap    Matching arrow  Hit slider    Esc  Back", 15, UI.MUTED)
 	instructions.size_flags_horizontal = SIZE_EXPAND_FILL
 	footer.add_child(instructions)
 	_feedback = UI.label("", 18, UI.ACCENT)
@@ -94,12 +94,12 @@ func _build_result() -> void:
 	_veil.hide()
 
 func start_run(chart: Chart, stream: AudioStreamWAV, cursor: float) -> void:
-	_schedule = chart.schedule()
 	arena.approach_horizon = chart.approach_horizon()
 	arena.center_rotation_track = chart.center_rotation_track()
 	transport.load_song(stream)
 	var bounds := chart.playback_bounds(transport.duration())
 	transport.set_playback_range(bounds.start, bounds.end)
+	_schedule = chart.schedule(transport.playback_start, transport.playback_end)
 	_cursor = clampf(cursor, transport.playback_start, transport.playback_end)
 	_title.text = chart.title
 	_restart()
@@ -142,9 +142,9 @@ func _key_input(event: InputEventKey) -> void:
 		KEY_ESCAPE:
 			_leave()
 		KEY_LEFT:
-			_turn(-1.0)
+			_hit_arrow(-1)
 		KEY_RIGHT:
-			_turn(1.0)
+			_hit_arrow(1)
 		_:
 			if _paused or _finished:
 				_continue_run()
@@ -155,6 +155,11 @@ func _key_input(event: InputEventKey) -> void:
 func _turn(direction: float) -> void:
 	if not _paused and not _finished:
 		session.rotate(direction, transport.song_time())
+
+func _hit_arrow(direction: int) -> void:
+	if not _paused and not _finished:
+		session.press_arrow(direction, transport.song_time())
+		_update_view()
 
 func pause_run() -> void:
 	if not is_visible_in_tree() or session == null or _paused or _finished:

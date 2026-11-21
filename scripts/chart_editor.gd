@@ -151,7 +151,15 @@ func _build_editor() -> VBoxContainer:
 	screen.add_child(timeline)
 	var footer := HBoxContainer.new()
 	screen.add_child(footer)
-	var shortcuts := UI.label("Click  Note    Shift-click  Spike    Right-click  Delete    Ctrl-wheel  Zoom", 13, UI.MUTED)
+	var tool := OptionButton.new()
+	tool.add_item("Tap note", Timeline.Placement.NOTE)
+	tool.add_item("Spike", Timeline.Placement.SPIKE)
+	tool.add_item("Left slider", Timeline.Placement.SLIDER_LEFT)
+	tool.add_item("Right slider", Timeline.Placement.SLIDER_RIGHT)
+	tool.tooltip_text = "Choose what a left click places on the timeline."
+	tool.item_selected.connect(func(index: int) -> void: timeline.placement = tool.get_item_id(index))
+	footer.add_child(tool)
+	var shortcuts := UI.label("Shift-click  Spike    Right-click  Delete    Ctrl-wheel  Zoom", 13, UI.MUTED)
 	shortcuts.size_flags_horizontal = SIZE_EXPAND_FILL
 	footer.add_child(shortcuts)
 	_status = UI.label("", 14, UI.ACCENT)
@@ -255,7 +263,7 @@ func _build_zone_settings() -> VBoxContainer:
 	fields.add_theme_constant_override("h_separation", 8)
 	fields.add_theme_constant_override("v_separation", 6)
 	_zone_settings.add_child(fields)
-	_add_zone_field(fields, "Spawn distance", "spawn_radius", Chart.MIN_SPAWN_RADIUS, T.OUTER_RADIUS, 1.0, "", "Initial polygon radius from the center.")
+	_add_zone_field(fields, "Spawn distance", "spawn_radius", Chart.MIN_SPAWN_RADIUS, Chart.MAX_SPAWN_RADIUS, 1.0, "", "Initial polygon radius from the center. Larger values can start outside the arena.")
 	_add_zone_field(fields, "Start speed", "start_speed", Chart.MIN_APPROACH_SPEED, Chart.MAX_APPROACH_SPEED, 1.0, "", "Approach speed at the beginning, in units per second.")
 	_add_zone_field(fields, "Rotation offset", "rotation_offset", -360.0, 360.0, 0.1, "°", "Initial rotation relative to the charted direction.")
 	_add_zone_field(fields, "End speed", "end_speed", Chart.MIN_APPROACH_SPEED, Chart.MAX_APPROACH_SPEED, 1.0, "", "Approach speed at the end, in units per second.")
@@ -529,11 +537,14 @@ func _remember_edit() -> void:
 	if _undo.size() > 100:
 		_undo.pop_front()
 
-func _place(beat: float, lane: int, spike: bool) -> void:
+func _place(beat: float, lane: int, spike: bool, slider_direction: int = 0) -> void:
 	if chart.event_at(beat, lane) >= 0:
 		return
 	_remember_edit()
-	chart.events.append({"beat": beat, "lane": lane, "spike": spike})
+	var item := {"beat": beat, "lane": lane, "spike": spike}
+	if slider_direction != 0:
+		item.slider_direction = slider_direction
+	chart.events.append(item)
 	_after_edit(chart.events.size() - 1)
 
 func _remove(index: int) -> void:
@@ -545,7 +556,10 @@ func _move(index: int, beat: float, lane: int) -> void:
 	if chart.event_at(beat, lane) >= 0:
 		return
 	_remember_edit()
-	chart.events[index] = {"beat": beat, "lane": lane, "spike": chart.events[index].spike}
+	var item := chart.events[index].duplicate()
+	item.beat = beat
+	item.lane = lane
+	chart.events[index] = item
 	_after_edit(index)
 
 func _select(index: int) -> void:

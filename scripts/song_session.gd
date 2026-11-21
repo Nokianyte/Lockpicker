@@ -30,14 +30,23 @@ var _inner := 0
 var _turn_from := 0.0
 var _turn_target := 0.0
 var _turn_started := -INF
+var _center_turn_from := 0.0
+var _center_turn_target := 0.0
+var _center_turn_started := -INF
 
 func setup(schedule: Array[Dictionary], length: float, cursor: float, start: float) -> void:
 	time = start
 	duration = length
+	var skipped_slider_steps := 0
 	for event in schedule:
-		if event.time >= cursor and event.time < duration:
+		if event.time < cursor:
+			skipped_slider_steps += int(event.get("slider_direction", 0))
+		elif event.time < duration:
 			_deadline_order.append(events.size())
 			events.append(event)
+	# Cursor playtests start with the target angle from a clean run up to the cursor.
+	_center_turn_target = (skipped_slider_steps % 6) * T.WHEEL_STEP
+	_center_turn_from = _center_turn_target
 	resolved.resize(events.size())
 	_deadline_order.sort_custom(func(a: int, b: int) -> bool:
 		var left := _deadline(a)
@@ -59,6 +68,21 @@ func turn_offset(index: int, at: float) -> float:
 
 func rotate(direction: float, at: float) -> void:
 	advance_to(at)
+	_turn_inner(direction)
+
+func center_angle(at: float) -> float:
+	return T.TIP_ANGLE + G.turn_angle(_center_turn_from, _center_turn_target, at - _center_turn_started)
+
+func _turn_center(direction: int) -> void:
+	var elapsed := time - _center_turn_started
+	_center_turn_from = G.turn_angle(_center_turn_from, _center_turn_target, elapsed)
+	if elapsed >= T.TURN_DURATION:
+		_center_turn_from = wrapf(_center_turn_from, -PI, PI)
+		_center_turn_target = _center_turn_from
+	_center_turn_target += direction * T.WHEEL_STEP
+	_center_turn_started = time
+
+func _turn_inner(direction: float) -> void:
 	if energy == 0 or _inner >= events.size():
 		return
 	var current := G.turn_angle(_turn_from, _turn_target, time - _turn_started)
@@ -81,7 +105,7 @@ func advance_to(at: float, finishing: bool = false) -> void:
 		if resolved[index]:
 			continue
 		if event.spike:
-			if G.song_spike_aligns(ring_angle(index, event.time)):
+			if G.song_spike_aligns(ring_angle(index, event.time), center_angle(event.time)):
 				spike_hits += 1
 				_penalize("Spike", deadline)
 		else:
@@ -93,6 +117,25 @@ func press(at: float) -> void:
 	advance_to(at)
 	if energy == 0:
 		return
+	var index := _nearest_note(false)
+	if index < 0:
+		_feedback("Off beat", time)
+		return
+	_hit_note(index)
+
+func press_arrow(direction: int, at: float) -> void:
+	advance_to(at)
+	if energy == 0:
+		return
+	var index := _nearest_note(true)
+	if index < 0:
+		_turn_inner(direction)
+	elif int(events[index].slider_direction) != direction:
+		_feedback("Wrong arrow", time)
+	else:
+		_hit_note(index)
+
+func _nearest_note(slider: bool) -> int:
 	var best := -1
 	var distance := HIT_WINDOW + CLOCK_EPSILON
 	for index in range(first_event_at(events, time - distance), events.size()):
@@ -100,17 +143,19 @@ func press(at: float) -> void:
 		if event.time > time + HIT_WINDOW + CLOCK_EPSILON:
 			break
 		var error := absf(event.time - time)
-		if not event.spike and not resolved[index] and error < distance:
+		if not event.spike and event.has("slider_direction") == slider and not resolved[index] and error < distance:
 			best = index
 			distance = error
-	if best < 0:
-		_feedback("Off beat", time)
-		return
-	var note := events[best]
-	if not G.gap_accepts_tip(T.TIP_ANGLE, ring_angle(best, time)):
+	return best
+
+func _hit_note(index: int) -> void:
+	var note := events[index]
+	if not G.gap_accepts_tip(center_angle(time), ring_angle(index, time)):
 		_feedback("Wrong direction", time)
 		return
-	_resolve(best)
+	_resolve(index)
+	if note.has("slider_direction"):
+		_turn_center(note.slider_direction)
 	hits += 1
 	combo += 1
 	energy = mini(MAX_ENERGY, energy + ENERGY_PER_HIT)

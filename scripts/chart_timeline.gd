@@ -1,7 +1,7 @@
 extends Control
 
 signal sought(time: float)
-signal placed(beat: float, lane: int, spike: bool)
+signal placed(beat: float, lane: int, spike: bool, slider_direction: int)
 signal removed(index: int)
 signal moved(index: int, beat: float, lane: int)
 signal selected(index: int)
@@ -17,6 +17,8 @@ const RIGHT := 12.0
 const BOTTOM := 16.0
 const ZONE_HANDLE_Y := 30.0
 
+enum Placement { NOTE, SPIKE, SLIDER_LEFT, SLIDER_RIGHT }
+
 var chart: Chart
 var waveform: PackedFloat32Array
 var waveform_completed := 0
@@ -30,6 +32,7 @@ var selection := -1
 var zone_selection := -1
 var start_time := 0.0
 var span := 8.0
+var placement := Placement.NOTE
 
 var _drag_index := -1
 var _drag_zone := -1
@@ -105,11 +108,11 @@ func _draw() -> void:
 		var item := chart.events[index]
 		var x := _x_at(chart.time_at(item.beat))
 		if x >= LEFT and x <= plot.end.x:
-			_draw_marker(Vector2(x, _y_at(item.lane)), item.spike, index == selection)
+			_draw_marker(Vector2(x, _y_at(item.lane)), item, index == selection)
 	if _drag_index >= 0 and _drag_position.distance_to(_drag_origin) >= 4.0 and _drag_position.x >= LEFT:
 		var x := _x_at(chart.time_at(chart.snap(_time_at(_drag_position.x))))
 		if x >= LEFT and x <= plot.end.x:
-			_draw_marker(Vector2(x, _y_at(_lane_at(_drag_position.y))), chart.events[_drag_index].spike, true)
+			_draw_marker(Vector2(x, _y_at(_lane_at(_drag_position.y))), chart.events[_drag_index], true)
 	_draw_trimmed_ranges(plot)
 	_draw_zones(plot)
 	var cursor_x := _x_at(playhead)
@@ -199,11 +202,13 @@ func _draw_waveform(plot: Rect2) -> void:
 	if not lines.is_empty():
 		draw_multiline(lines, Palette.WAVEFORM)
 
-func _draw_marker(point: Vector2, spike: bool, highlighted: bool) -> void:
+func _draw_marker(point: Vector2, item: Dictionary, highlighted: bool) -> void:
 	if highlighted:
 		draw_circle(point, 11.0, Palette.RED, false, 1.45, true)
-	if spike:
+	if item.spike:
 		Art.spiky_circle(self, point, 5.6, -PI / 2.0, Palette.SPIKE)
+	elif item.has("slider_direction"):
+		Art.slider_marker(self, point, 7.0, Vector2(item.slider_direction, 0), Palette.INK, 1.4)
 	else:
 		draw_circle(point, 6.0, Palette.INK, true, -1, true)
 
@@ -279,9 +284,13 @@ func _click(event: InputEventMouseButton) -> void:
 				_drag_index = index
 				_drag_origin = point
 				_drag_position = point
-			else:
-				if _valid_beat(beat):
-					placed.emit(beat, lane, event.shift_pressed)
+			elif _valid_beat(beat):
+				var tool := Placement.SPIKE if event.shift_pressed else placement
+				var direction := 0
+				match tool:
+					Placement.SLIDER_LEFT: direction = -1
+					Placement.SLIDER_RIGHT: direction = 1
+				placed.emit(beat, lane, tool == Placement.SPIKE, direction)
 
 func _valid_beat(beat: float) -> bool:
 	var time := chart.time_at(beat)

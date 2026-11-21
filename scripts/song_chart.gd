@@ -8,6 +8,7 @@ const MIN_PLAYBACK_SECONDS := 0.001
 const SUBDIVISIONS := [1, 2, 4, 8, 16, 32]
 const DIRECTIONS := ["Up", "Upper right", "Lower right", "Down", "Lower left", "Upper left"]
 const MIN_SPAWN_RADIUS := T.SONG_CORE_RADIUS + 1.0
+const MAX_SPAWN_RADIUS := 3000.0
 const DEFAULT_APPROACH := 1.65
 const MIN_APPROACH_SPEED := 30.0
 const MAX_APPROACH_SPEED := 2000.0
@@ -134,7 +135,10 @@ func schedule(start: float = -INF, end: float = INF) -> Array[Dictionary]:
 	for event in events:
 		var time := time_at(event.beat)
 		if time >= start and time < end:
-			result.append({"time": time, "lane": event.lane, "spike": event.spike})
+			var scheduled := {"time": time, "lane": event.lane, "spike": event.spike}
+			if event.has("slider_direction"):
+				scheduled.slider_direction = event.slider_direction
+			result.append(scheduled)
 	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.time < b.time)
 	var index := 0
 	var motion := {}
@@ -192,20 +196,26 @@ static func from_record(record: Variant) -> RefCounted:
 			return null
 		if not number_between(event.get("lane"), 0, DIRECTIONS.size() - 1) or event.lane != int(event.lane) or not event.get("spike") is bool:
 			return null
+		var direction: Variant = event.get("slider_direction", 0)
+		if event.has("slider_direction") and (event.spike or not number_between(direction, -1.0, 1.0) or absf(float(direction)) != 1.0):
+			return null
 		var lane := int(event.lane)
 		var beat := float(event.beat)
 		var cell := "%d:%.6f" % [lane, beat]
 		if cells.has(cell):
 			return null
 		cells[cell] = true
-		chart.events.append({"beat": beat, "lane": lane, "spike": event.spike})
+		var item := {"beat": beat, "lane": lane, "spike": event.spike}
+		if direction != 0:
+			item.slider_direction = int(direction)
+		chart.events.append(item)
 	var saved_zones: Variant = record.get("zones", [])
 	if not saved_zones is Array:
 		return null
 	for zone in saved_zones:
 		if not zone is Dictionary or not number_between(zone.get("beat"), -1000000, 1000000):
 			return null
-		if not number_between(zone.get("spawn_radius"), MIN_SPAWN_RADIUS, T.OUTER_RADIUS):
+		if not number_between(zone.get("spawn_radius"), MIN_SPAWN_RADIUS, MAX_SPAWN_RADIUS):
 			return null
 		if not number_between(zone.get("start_speed"), MIN_APPROACH_SPEED, MAX_APPROACH_SPEED) or not number_between(zone.get("end_speed"), MIN_APPROACH_SPEED, MAX_APPROACH_SPEED):
 			return null

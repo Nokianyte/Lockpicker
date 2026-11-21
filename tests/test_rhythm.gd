@@ -81,6 +81,37 @@ func _check_hit_bindings() -> void:
 	event.keycode = KEY_SPACE
 	_check(not event.is_action_pressed("song_hit"), "Space must not trigger a song hit.")
 
+func _check_sliders() -> void:
+	var right := _event(1.0)
+	right.slider_direction = 1
+	var left := _event(2.0, 1)
+	left.slider_direction = -1
+	var model := _session([right, _event(1.5, 1), _event(1.75, 1, true), left, _event(2.5)])
+	model.press(0.95)
+	model.press_arrow(-1, 0.96)
+	_check(model.hits == 0 and model.resolved[0] == 0 and model.feedback == "Wrong arrow", "A slider must stay available after a tap or the wrong arrow.")
+	model.press_arrow(1, 1.0)
+	_check(model.hits == 1 and is_equal_approx(model.center_angle(1.08), T.TIP_ANGLE + T.WHEEL_STEP / 2.0), "A timed right slider must turn the center clockwise.")
+	_check(is_equal_approx(model.ring_angle(1, 1.5), Chart.direction_angle(1)), "Slider turns must leave later rings in their charted orientations.")
+	model.press(1.5)
+	model.advance_to(1.75)
+	_check(model.hits == 2 and model.spike_hits == 1, "Both taps and spikes must use the shifted target for judgment.")
+	model.press_arrow(-1, 2.0)
+	model.press(2.5)
+	_check(model.hits == 4 and is_equal_approx(model.center_angle(2.5), T.TIP_ANGLE), "A left slider must undo the previous right step and aim the following tap.")
+	model = _session([{"time": 1.0, "lane": 1, "spike": false, "slider_direction": 1}])
+	model.press_arrow(1, 0.9)
+	_check(model.hits == 0 and model.feedback == "Wrong direction", "The correct arrow cannot hit a slider in the wrong lane.")
+	model.advance_to(1.11)
+	_check(model.misses == 1 and model.center_angle(1.11) == T.TIP_ANGLE, "A missed slider must not turn the center.")
+	model = _session([{"time": 1.0, "lane": 1, "spike": false, "slider_direction": 1}])
+	model.press_arrow(-1, 0.75)
+	model.press_arrow(1, 1.0)
+	_check(model.hits == 1, "An arrow outside the hit window must still aim the ring for a slider.")
+	model = _session([right, _event(1.5, 1)], 1.5)
+	model.press(1.5)
+	_check(model.hits == 1 and is_equal_approx(model.center_angle(1.5), T.TIP_ANGLE + T.WHEEL_STEP), "Cursor playtest must start with the target angle from earlier sliders.")
+
 func _check_zone_motion() -> void:
 	var chart := Chart.new()
 	chart.zones = [Chart.new_zone(4.0), Chart.new_zone(8.0)]
@@ -154,11 +185,11 @@ func _check_application(app, wav: PackedByteArray) -> void:
 	var chart: Chart = app.editor.chart
 	var stream: AudioStreamWAV = app.editor.transport.song
 	_check(stream.get_length() == 6.0, "The native editor must accept a six-second WAV.")
-	app.editor.timeline.placed.emit(4.0, 0, false)
-	app.editor.timeline.placed.emit(4.0, 1, true)
+	app.editor.timeline.placed.emit(4.0, 0, false, 0)
+	app.editor.timeline.placed.emit(4.0, 1, true, 0)
 	app.editor.timeline.removed.emit(1)
 	_check(chart.events.size() == 1 and not chart.events[0].spike, "Erasing a simultaneous spike must preserve the other lane.")
-	app.editor.timeline.placed.emit(4.0, 1, true)
+	app.editor.timeline.placed.emit(4.0, 1, true, 0)
 	app.editor.timeline.moved.emit(1, 4.0, 3)
 	app.editor._seek(2.0)
 	app.editor._play(true)
@@ -215,10 +246,15 @@ func _check_storage(library: Library, arguments: PackedStringArray, wav: PackedB
 	trimmed.end_offset = -0.5
 	_check(Chart.from_record(trimmed) == null, "Negative song trims must be rejected.")
 	chart.zones.append(Chart.new_zone(1.5))
+	chart.zones[0].spawn_radius = Chart.MAX_SPAWN_RADIUS
 	chart.zones[0].rotation_offset = -60.0
 	chart.zones[0].center_rotation_speed = -90.0
+	chart.events.append({"beat": 3.0, "lane": 2, "spike": false, "slider_direction": -1})
 	var with_zone := chart.record()
-	_check(Chart.from_record(with_zone).record() == with_zone, "Zone settings must round-trip with the chart.")
+	_check(Chart.from_record(with_zone).record() == with_zone, "Offscreen spawn distance and slider direction must round-trip with the chart.")
+	var invalid_slider := with_zone.duplicate(true)
+	invalid_slider.events[1].slider_direction = 0
+	_check(Chart.from_record(invalid_slider) == null, "A slider must have a left or right direction.")
 	var old_zone := with_zone.duplicate(true)
 	old_zone.zones[0].erase("center_rotation_speed")
 	reopened = Chart.from_record(old_zone)
@@ -242,6 +278,7 @@ func _check_storage(library: Library, arguments: PackedStringArray, wav: PackedB
 		_check(saved.has("chart") and saved.chart.title == "Updated timing check", "The last successful native save must survive a restart.")
 		_check(saved.has("stream") and is_equal_approx(saved.stream.get_length(), 6.0), "The saved song must reopen without another import.")
 		_check(saved.has("chart") and saved.chart.zones == chart.zones, "Saved zone settings must survive a fresh process.")
+		_check(saved.has("chart") and saved.chart.events == chart.events, "Saved sliders must survive a fresh process.")
 
 func _check_song_offsets(app, wav: PackedByteArray) -> void:
 	var editor = app.editor
@@ -251,7 +288,7 @@ func _check_song_offsets(app, wav: PackedByteArray) -> void:
 	editor._start_offset.value = 1.0
 	editor._end_offset.value = 3.5
 	for beat in [1.0, 2.0, 4.0, 5.0, 8.0]:
-		editor.timeline.placed.emit(beat, 0, false)
+		editor.timeline.placed.emit(beat, 0, false, 0)
 	_check(editor.timeline.duration == 6.0 and chart.events.size() == 5, "Trimming must preserve the original timeline and chart events.")
 	_check(editor.preview.events.size() == 2 and editor.preview.events[0].time == 1.0, "The preview must include the start boundary and exclude the end boundary.")
 	editor._seek(0.25)
@@ -277,7 +314,7 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	editor._open_editor(chart, null)
 	editor._accept_song({"name": "Zones.wav", "bytes": wav})
 	await process_frame
-	editor.timeline.placed.emit(6.0, 0, true)
+	editor.timeline.placed.emit(6.0, 0, true, 0)
 	editor._seek(2.04)
 	editor._add_zone_button.pressed.emit()
 	_check(chart.zones.size() == 1 and chart.zones[0].beat == 4.0 and editor._zone_settings.visible, "Adding a zone must snap at the playhead and open its settings.")
@@ -307,10 +344,19 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	undo.pressed = true
 	editor._unhandled_key_input(undo)
 	_check(chart.zones.size() == 1 and chart.zones[0].beat == 5.0, "Undo must restore the deleted zone at its moved start.")
+	var timeline = editor.timeline
+	timeline.placement = timeline.Placement.SLIDER_RIGHT
+	click.position = Vector2(timeline._x_at(4.0), timeline._y_at(2))
+	click.pressed = true
+	timeline._gui_input(click)
+	_check(chart.events.back().slider_direction == 1, "The selected placement tool must create a right slider from the grid.")
+	timeline.moved.emit(1, 9.0, 4)
+	_check(editor.preview.events.back().slider_direction == 1 and chart.events.back().lane == 4, "Moving a slider must preserve its arrow and update preview.")
 
 func _run() -> void:
 	_check_judgment()
 	_check_hit_bindings()
+	_check_sliders()
 	_check_zone_motion()
 	_check_center_rotation()
 	var app := AppScene.instantiate()

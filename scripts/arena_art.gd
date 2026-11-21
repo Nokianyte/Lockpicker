@@ -35,3 +35,10 @@ static func spiky_circle(canvas: CanvasItem, center: Vector2, radius: float, ang
 		var tooth := radius * (1.35 if point % 2 == 0 else 0.72)
 		outline.append(center + Vector2.from_angle(direction) * tooth)
 	canvas.draw_colored_polygon(outline, ink)
+
+static func slider_marker(canvas: CanvasItem, center: Vector2, radius: float, axis: Vector2, ink: Color, width: float) -> void:
+	canvas.draw_arc(center, radius, 0.0, TAU, 24, ink, width, true)
+	var tip := center + axis * radius * 0.62
+	var wing := axis.orthogonal() * radius * 0.33
+	canvas.draw_line(center - axis * radius * 0.62, tip, ink, width, true)
+	canvas.draw_polyline(PackedVector2Array([center + wing, tip, center - wing]), ink, width, true)

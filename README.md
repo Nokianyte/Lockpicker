@@ -15,9 +15,11 @@ Scroll one notch or press the Left or Right Arrow to turn the innermost ring 60�
 
 Open **Charts → New chart** and import an MP3 or WAV file. Set the BPM and first-beat offset against the waveform, then choose a grid subdivision. Left-click a lane to place a note, Shift + left-click to place a spike, and right-click a marker to delete it. Drag a marker to move it. Use the wheel to scroll the timeline and Ctrl + wheel to zoom.
 
+Choose **Left slider** or **Right slider** from the placement menu below the grid, then click a lane to place it. Aim a slider at the red circle and press its arrow on the beat. A hit rotates the center and target 60° in that direction for following notes. The wheel still turns the incoming ring, and the arrows also turn it outside slider hit windows. A cursor playtest starts at the angle you would reach by hitting the earlier sliders.
+
 In **Info / Settings**, set **Start offset** and **End offset** to skip seconds from either end of the song. The grid stays aligned to the original recording, with trimmed sections shaded on the timeline.
 
-Use **+ Zone** to add a zone at the playhead. Click its diamond to open its settings or drag the diamond to move the start. Each zone applies through the next marker or the end of the chart. **Spawn distance** sets the starting radius. **Start speed** and **End speed** set each polygon’s approach speeds in units per second. The **Rotation offset** winds back to the charted direction with the same speed change. Polygons still arrive on beat.
+Use **+ Zone** to add a zone at the playhead. Click its diamond to open its settings or drag the diamond to move the start. Each zone applies through the next marker or the end of the chart. **Spawn distance** sets the starting radius, up to 3,000 units for entrances from offscreen. **Start speed** and **End speed** set each polygon’s approach speeds in units per second. The **Rotation offset** winds back to the charted direction with the same speed change. Polygons still arrive on beat.
 
 **Center rotation speed** turns the center polygon, red target, and incoming polygons together in degrees per second. Positive values turn clockwise and negative values turn counterclockwise. The arena keeps its current angle when a zone changes the speed. Incoming polygons apply their own rotation offset on top.
 

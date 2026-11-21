@@ -15,7 +15,7 @@ Scroll one notch or press the Left or Right Arrow to turn the innermost ring 60�
 
 Open **Charts → New chart** and import an MP3 or WAV file. Set the BPM and first-beat offset against the waveform, then choose a grid subdivision. Left-click a lane to place a note, Shift + left-click to place a spike, and right-click a marker to delete it. Drag a marker to move it. Use the wheel to scroll the timeline and Ctrl + wheel to zoom.
 
-Choose **Left slider** or **Right slider** from the placement menu below the grid, then click a lane to place it. Aim a slider at the red circle and press its arrow on the beat. A hit rotates the center and target 60° in that direction for following notes. The wheel still turns the incoming ring, and the arrows also turn it outside slider hit windows. A cursor playtest starts at the angle you would reach by hitting the earlier sliders.
+Choose **Left slider** or **Right slider** from the placement menu below the grid, then click a lane to place it. Each slider rotates the center and target 60° on its beat, even if you miss it. Aim at the red circle and press the matching arrow to score the hit. The wheel still turns the incoming ring, and the arrows also turn it outside slider hit windows. Preview and cursor playtests use the same scheduled turns.
 
 In **Info / Settings**, set **Start offset** and **End offset** to skip seconds from either end of the song. The grid stays aligned to the original recording, with trimmed sections shaded on the timeline.
 

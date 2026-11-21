@@ -6,6 +6,7 @@ signal play_requested(chart, stream: AudioStreamWAV, cursor: float, from_editor:
 const Arena = preload("res://scripts/song_arena.gd")
 const Chart = preload("res://scripts/song_chart.gd")
 const Library = preload("res://scripts/chart_library.gd")
+const Session = preload("res://scripts/song_session.gd")
 const T = preload("res://scripts/tuning.gd")
 const Timeline = preload("res://scripts/chart_timeline.gd")
 const Transport = preload("res://scripts/song_transport.gd")
@@ -528,6 +529,7 @@ func _timing_changed() -> void:
 
 func _refresh_schedule() -> void:
 	preview.events = chart.schedule(transport.playback_start, transport.playback_end)
+	preview.slider_turns = Session.build_slider_turns(preview.events)
 	preview.approach_horizon = chart.approach_horizon()
 	preview.center_rotation_track = chart.center_rotation_track()
 	preview.queue_redraw()

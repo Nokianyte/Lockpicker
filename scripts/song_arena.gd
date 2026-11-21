@@ -8,6 +8,7 @@ const T = preload("res://scripts/tuning.gd")
 const Session = preload("res://scripts/song_session.gd")
 
 var events: Array[Dictionary] = []
+var slider_turns: Array[Dictionary] = []
 var approach_horizon := Chart.DEFAULT_APPROACH
 var center_rotation_track: Array[Dictionary] = []
 var song_time := 0.0
@@ -35,9 +36,10 @@ func _draw() -> void:
 	if not _grid.is_empty():
 		draw_multiline(_grid, Palette.BORDER)
 	var schedule := session.events if session != null else events
+	var turns := session.slider_turns if session != null else slider_turns
 	var at := session.time if session != null else song_time
 	var rotation := Chart.center_rotation_at(center_rotation_track, at)
-	var target_angle := session.center_angle(at) if session != null else T.TIP_ANGLE
+	var target_angle := Session.center_angle_at(turns, at)
 	# Draw in the same center-relative frame that judging uses.
 	draw_set_transform(size * 0.5, rotation)
 	_draw_core(zoom, target_angle)
@@ -70,7 +72,7 @@ func _draw() -> void:
 			Art.ring(self, Vector2.ZERO, zoom, radius, angle, Color(Palette.SPIKE, visibility * 0.33), 1.0)
 			Art.spiky_circle(self, marker, T.SONG_MARKER_RADIUS * zoom, angle, Color(Palette.SPIKE, visibility))
 		else:
-			var aligned := absf(remaining) <= Session.HIT_WINDOW and G.gap_accepts_tip(target_angle, angle)
+			var aligned := absf(remaining) <= Session.HIT_WINDOW and G.gap_accepts_tip(Session.note_target_angle(turns, event, at), angle)
 			var ink := Color(Palette.RED if aligned else Palette.INK, visibility)
 			var width := lerpf(2.3, 1.0, approach)
 			Art.ring(self, Vector2.ZERO, zoom, radius, angle, ink, width)

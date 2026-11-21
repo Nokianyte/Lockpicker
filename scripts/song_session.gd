@@ -12,6 +12,7 @@ const ENERGY_PER_MISTAKE := 15
 const CLOCK_EPSILON := 0.000001
 
 var events: Array[Dictionary] = []
+var slider_turns: Array[Dictionary] = []
 var resolved := PackedByteArray()
 var energy := MAX_ENERGY
 var combo := 0
@@ -30,23 +31,15 @@ var _inner := 0
 var _turn_from := 0.0
 var _turn_target := 0.0
 var _turn_started := -INF
-var _center_turn_from := 0.0
-var _center_turn_target := 0.0
-var _center_turn_started := -INF
 
 func setup(schedule: Array[Dictionary], length: float, cursor: float, start: float) -> void:
 	time = start
 	duration = length
-	var skipped_slider_steps := 0
+	slider_turns = build_slider_turns(schedule)
 	for event in schedule:
-		if event.time < cursor:
-			skipped_slider_steps += int(event.get("slider_direction", 0))
-		elif event.time < duration:
+		if event.time >= cursor and event.time < duration:
 			_deadline_order.append(events.size())
 			events.append(event)
-	# Cursor playtests start with the target angle from a clean run up to the cursor.
-	_center_turn_target = (skipped_slider_steps % 6) * T.WHEEL_STEP
-	_center_turn_from = _center_turn_target
 	resolved.resize(events.size())
 	_deadline_order.sort_custom(func(a: int, b: int) -> bool:
 		var left := _deadline(a)
@@ -71,16 +64,37 @@ func rotate(direction: float, at: float) -> void:
 	_turn_inner(direction)
 
 func center_angle(at: float) -> float:
-	return T.TIP_ANGLE + G.turn_angle(_center_turn_from, _center_turn_target, at - _center_turn_started)
+	return center_angle_at(slider_turns, at)
 
-func _turn_center(direction: int) -> void:
-	var elapsed := time - _center_turn_started
-	_center_turn_from = G.turn_angle(_center_turn_from, _center_turn_target, elapsed)
-	if elapsed >= T.TURN_DURATION:
-		_center_turn_from = wrapf(_center_turn_from, -PI, PI)
-		_center_turn_target = _center_turn_from
-	_center_turn_target += direction * T.WHEEL_STEP
-	_center_turn_started = time
+static func build_slider_turns(schedule: Array[Dictionary]) -> Array[Dictionary]:
+	var turns: Array[Dictionary] = []
+	var steps := 0
+	for event in schedule:
+		if event.has("slider_direction"):
+			var direction: int = event.slider_direction
+			steps += direction
+			turns.append({"time": event.time, "direction": direction, "steps": steps})
+	return turns
+
+static func center_angle_at(turns: Array[Dictionary], at: float) -> float:
+	var stop := first_event_at(turns, at)
+	if stop == 0:
+		return T.TIP_ANGLE
+	var offset := (int(turns[stop - 1].steps) % 6) * T.WHEEL_STEP
+	# Start with the full turns, then subtract the portion of each turn still in progress.
+	for index in range(stop - 1, -1, -1):
+		var turn := turns[index]
+		var elapsed := at - float(turn.time)
+		if elapsed >= T.TURN_DURATION:
+			break
+		var step := int(turn.direction) * T.WHEEL_STEP
+		offset -= step - G.turn_angle(0.0, step, elapsed)
+	return T.TIP_ANGLE + offset
+
+static func note_target_angle(turns: Array[Dictionary], note: Dictionary, at: float) -> float:
+	# A slider's own scheduled turn must not pull its target away during the late hit window.
+	var aim_at := minf(at, note.time) if note.has("slider_direction") else at
+	return center_angle_at(turns, aim_at)
 
 func _turn_inner(direction: float) -> void:
 	if energy == 0 or _inner >= events.size():
@@ -150,12 +164,10 @@ func _nearest_note(slider: bool) -> int:
 
 func _hit_note(index: int) -> void:
 	var note := events[index]
-	if not G.gap_accepts_tip(center_angle(time), ring_angle(index, time)):
+	if not G.gap_accepts_tip(note_target_angle(slider_turns, note, time), ring_angle(index, time)):
 		_feedback("Wrong direction", time)
 		return
 	_resolve(index)
-	if note.has("slider_direction"):
-		_turn_center(note.slider_direction)
 	hits += 1
 	combo += 1
 	energy = mini(MAX_ENERGY, energy + ENERGY_PER_HIT)

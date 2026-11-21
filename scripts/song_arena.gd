@@ -6,6 +6,12 @@ const G = preload("res://scripts/wall_geometry.gd")
 const Palette = preload("res://scripts/palette.gd")
 const T = preload("res://scripts/tuning.gd")
 const Session = preload("res://scripts/song_session.gd")
+const JUDGMENT_COLORS := {
+	Session.Judgment.PERFECT: Palette.PERFECT,
+	Session.Judgment.GOOD: Palette.GOOD,
+	Session.Judgment.OK: Palette.OK,
+	Session.Judgment.MISS: Palette.RED,
+}
 
 var events: Array[Dictionary] = []
 var slider_turns: Array[Dictionary] = []
@@ -40,9 +46,15 @@ func _draw() -> void:
 	var at := session.time if session != null else song_time
 	var rotation := Chart.center_rotation_at(center_rotation_track, at)
 	var target_angle := Session.center_angle_at(turns, at)
+	var tint := Palette.SONG_CORE
+	var age := INF
+	if session != null:
+		tint = JUDGMENT_COLORS.get(session.judgment, Palette.SONG_CORE)
+		age = at - session.judgment_at
+	var flash := 1.0 - smoothstep(0.07, 0.28, age)
 	# Draw in the same center-relative frame that judging uses.
 	draw_set_transform(size * 0.5, rotation)
-	_draw_core(zoom, target_angle)
+	_draw_core(zoom, target_angle, Palette.SONG_CORE.lerp(tint, flash), lerpf(0.055, 0.14, flash))
 	var first := Session.first_event_at(schedule, at - Session.HIT_WINDOW)
 	# The hexagon's nearest edge can reach a corner before any of its vertices enter view.
 	var marker_margin := maxf(8.0, T.SONG_MARKER_RADIUS * 1.35 * zoom) + 2.0
@@ -84,16 +96,15 @@ func _draw() -> void:
 	var marker := G.song_marker(T.SONG_CORE_RADIUS, target_angle) * zoom
 	draw_circle(marker, T.SONG_MARKER_RADIUS * zoom, Palette.RED_WASH, true, -1.0, true)
 	draw_arc(marker, T.SONG_MARKER_RADIUS * zoom, 0.0, TAU, 24, Palette.RED, 2.0, true)
-	if session != null:
-		var age := (at - session.last_hit_at) / T.BREAK_TIME
-		if age >= 0.0 and age < 1.0:
-			draw_arc(marker, lerpf(5.0, 22.0, age), 0.0, TAU, 24, Color(Palette.RED, 1.0 - age), 1.6, true)
+	if session != null and session.judgment != Session.Judgment.MISS and age < T.BREAK_TIME:
+		var progress := age / T.BREAK_TIME
+		draw_arc(marker, lerpf(5.0, 22.0, progress), 0.0, TAU, 24, Color(tint, 1.0 - progress), 1.6, true)
 
-func _draw_core(zoom: float, target_angle: float) -> void:
+func _draw_core(zoom: float, target_angle: float, ink: Color, wash_opacity: float) -> void:
 	var points := PackedVector2Array()
 	for side in 6:
 		var vertex := target_angle + PI / 6.0 + side * T.WHEEL_STEP
 		points.append(Vector2.from_angle(vertex) * T.SONG_CORE_RADIUS * zoom)
-	draw_colored_polygon(points, Palette.RED_WASH)
+	draw_colored_polygon(points, Color(ink, wash_opacity))
 	points.append(points[0])
-	draw_polyline(points, Palette.RED, 2.5, true)
+	draw_polyline(points, ink.darkened(0.18), 2.5, true)

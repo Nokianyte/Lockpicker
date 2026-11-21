@@ -25,6 +25,8 @@ Use **+ Zone** to add a zone at the playhead. Click its diamond to open its sett
 
 Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Use the mouse wheel or Left / Right Arrow to turn the innermost ring toward the red circle, then tap **Z** or **X** on the beat. Spikes are spiky circles and cost the same energy as a missed note when their center is inside the red circle on their beat. Saved charts and their audio files stay in local game or browser storage.
 
+The center has a black outline and a light wash between judgments. Both tint bright yellow for **Perfect** (within 35 ms), green for **Good** (within 70 ms), soft yellow for **OK** (within 100 ms), and red for a miss or spike hit.
+
 ## Run locally
 
 Install the standard (GDScript) Godot **4.7.2** editor. Import `project.godot`, then press F5 to run the main scene. Or, with the executable on PATH:

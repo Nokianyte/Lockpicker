@@ -81,6 +81,23 @@ func _check_hit_bindings() -> void:
 	event.keycode = KEY_SPACE
 	_check(not event.is_action_pressed("song_hit"), "Space must not trigger a song hit.")
 
+func _check_judgment_tints() -> void:
+	var model := _session([_event(1.0), _event(2.0), _event(3.0), _event(4.0), _event(4.5, 0, true)])
+	model.press(0.8)
+	_check(model.judgment == Session.Judgment.NONE, "An off-beat press must leave the center at its idle color.")
+	model.press(1.035)
+	_check(model.judgment == Session.Judgment.PERFECT and model.feedback == "Perfect", "A hit at the Perfect boundary must trigger the Perfect tint.")
+	model.press(1.2)
+	_check(model.judgment == Session.Judgment.PERFECT and model.judgment_at == 1.035, "An invalid press must not replace or retrigger the last judgment tint.")
+	model.press(2.07)
+	_check(model.judgment == Session.Judgment.GOOD and model.feedback == "Good · Late", "A hit at the Good boundary must trigger the Good tint.")
+	model.press(2.9)
+	_check(model.judgment == Session.Judgment.OK and model.feedback == "OK · Early" and model.hits == 3, "A hit at the outer edge of the window must trigger the OK tint and still count.")
+	model.advance_to(4.11)
+	_check(model.judgment == Session.Judgment.MISS and model.judgment_at == 4.1 and model.feedback == "Miss", "A missed note must trigger the Miss tint at the deadline.")
+	model.advance_to(4.5)
+	_check(model.judgment == Session.Judgment.MISS and model.judgment_at == 4.5 and model.feedback == "Spike", "A spike hit must trigger the Miss tint.")
+
 func _check_sliders() -> void:
 	var right := _event(1.0)
 	right.slider_direction = 1
@@ -367,6 +384,7 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 func _run() -> void:
 	_check_judgment()
 	_check_hit_bindings()
+	_check_judgment_tints()
 	_check_sliders()
 	_check_zone_motion()
 	_check_center_rotation()

@@ -5,11 +5,15 @@ const T = preload("res://scripts/tuning.gd")
 const G = preload("res://scripts/wall_geometry.gd")
 
 const HIT_WINDOW := 0.10
+const PERFECT_WINDOW := 0.035
+const GOOD_WINDOW := 0.070
 const LEAD_IN := 1.5
 const MAX_ENERGY := 100
 const ENERGY_PER_HIT := 5
 const ENERGY_PER_MISTAKE := 15
 const CLOCK_EPSILON := 0.000001
+
+enum Judgment { NONE, PERFECT, GOOD, OK, MISS }
 
 var events: Array[Dictionary] = []
 var slider_turns: Array[Dictionary] = []
@@ -23,7 +27,8 @@ var time := 0.0
 var duration := 0.0
 var feedback := ""
 var feedback_at := -INF
-var last_hit_at := -INF
+var judgment := Judgment.NONE
+var judgment_at := -INF
 
 var _deadline_order: Array[int] = []
 var _deadline_cursor := 0
@@ -171,12 +176,15 @@ func _hit_note(index: int) -> void:
 	hits += 1
 	combo += 1
 	energy = mini(MAX_ENERGY, energy + ENERGY_PER_HIT)
-	last_hit_at = time
 	var timing := time - float(note.time)
-	if absf(timing) <= 0.035:
-		_feedback("On beat", time)
+	var error := absf(timing)
+	var timing_label := " · Early" if timing < 0.0 else " · Late"
+	if error <= PERFECT_WINDOW + CLOCK_EPSILON:
+		_judge(Judgment.PERFECT, "Perfect", time)
+	elif error <= GOOD_WINDOW + CLOCK_EPSILON:
+		_judge(Judgment.GOOD, "Good" + timing_label, time)
 	else:
-		_feedback("Early" if timing < 0.0 else "Late", time)
+		_judge(Judgment.OK, "OK" + timing_label, time)
 
 static func first_event_at(schedule: Array[Dictionary], at: float) -> int:
 	var low := 0
@@ -210,7 +218,12 @@ func _feedback(message: String, at: float) -> void:
 	feedback = message
 	feedback_at = at
 
+func _judge(result: Judgment, message: String, at: float) -> void:
+	judgment = result
+	judgment_at = at
+	_feedback(message, at)
+
 func _penalize(message: String, at: float) -> void:
 	energy = maxi(0, energy - ENERGY_PER_MISTAKE)
 	combo = 0
-	_feedback(message, at)
+	_judge(Judgment.MISS, message, at)

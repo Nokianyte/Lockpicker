@@ -424,6 +424,27 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	_check(is_equal_approx(timeline.playhead, 4.7), "Clicking the Target row must seek without placing an event.")
 	editor._start_offset.value = 4.6
 	_check(timeline.slider_turns.is_empty(), "The Target row must ignore sliders trimmed out of playback.")
+	editor._start_offset.value = 0.0
+	editor._select_zone(0)
+	editor._zone_fields.spawn_radius.value = 680.0
+	editor._zone_fields.end_speed.value = 320.0
+	editor._zone_colors.polygon_start_color.color_changed.emit(Color("ff6700"))
+	editor._zone_colors.polygon_end_color.color_changed.emit(Color("274a8c"))
+	var expected := chart.zones[0].duplicate(true)
+	editor._seek(5.0)
+	editor._add_zone_button.pressed.emit()
+	expected.beat = 10.0
+	_check(chart.zones[1] == expected, "A new zone must copy every setting from the preceding zone.")
+	editor._zone_fields.start_speed.value = 432.0
+	editor._seek(4.75)
+	editor._add_zone_button.pressed.emit()
+	expected.beat = 9.5
+	_check(chart.zones[1] == expected and chart.zones[2].start_speed == 432.0, "A zone inserted between markers must copy the earlier zone, even when the later marker is closer.")
+	editor._zone_fields.rotation_offset.value = 45.0
+	_check(chart.zones[0].rotation_offset == -120.0 and chart.zones[2].rotation_offset == -120.0, "Editing inherited settings must affect only the new zone.")
+	editor._seek(0.5)
+	editor._add_zone_button.pressed.emit()
+	_check(chart.zones[0] == Chart.new_zone(1.0), "A zone with no preceding marker must use default settings.")
 
 func _run() -> void:
 	_check_judgment()

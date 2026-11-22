@@ -73,6 +73,15 @@ func zone_at(beat: float) -> int:
 			return index
 	return -1
 
+func insert_zone(beat: float) -> int:
+	var index := zones.size()
+	while index > 0 and zones[index - 1].beat > beat:
+		index -= 1
+	var zone := new_zone(beat) if index == 0 else zones[index - 1].duplicate(true)
+	zone.beat = beat
+	zones.insert(index, zone)
+	return index
+
 func sort_zones() -> void:
 	zones.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.beat < b.beat)
 

@@ -335,7 +335,7 @@ func _build_transport() -> HBoxContainer:
 	)
 	bar.add_child(_grid)
 	_add_zone_button = UI.button("+ Zone", _add_zone)
-	_add_zone_button.tooltip_text = "Add a zone at the nearest grid line to the playhead. Click its diamond marker to edit or drag it to move."
+	_add_zone_button.tooltip_text = "Add a zone near the playhead and copy the preceding zone's settings. Click its diamond to edit or drag it to move."
 	bar.add_child(_add_zone_button)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -611,9 +611,7 @@ func _add_zone() -> void:
 		_select_zone(existing)
 		return
 	_remember_edit()
-	chart.zones.append(Chart.new_zone(beat))
-	chart.sort_zones()
-	_after_zone_edit(chart.zone_at(beat))
+	_after_zone_edit(chart.insert_zone(beat))
 
 func _select_zone(index: int) -> void:
 	timeline.zone_selection = index

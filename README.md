@@ -21,7 +21,7 @@ Choose **Left slider** (red) or **Right slider** (blue) from the placement menu 
 
 In **Info / Settings**, set **Start offset** and **End offset** to skip seconds from either end of the song. The grid stays aligned to the original recording, with trimmed sections shaded on the timeline.
 
-Use **+ Zone** to add a zone at the playhead. Click its diamond to open its settings or drag the diamond to move the start. Each zone applies through the next marker or the end of the chart. **Spawn distance** sets the starting radius, up to 3,000 units for entrances from offscreen. **Start speed** and **End speed** set each polygon’s approach speeds in units per second. The **Rotation offset** winds back to the charted direction with the same speed change. Polygons still arrive on beat.
+Use **+ Zone** to add a zone at the playhead. New zones copy the settings from the closest earlier zone. Click a zone’s diamond to open its settings or drag the diamond to move the start. Each zone applies through the next marker or the end of the chart. **Spawn distance** sets the starting radius, up to 3,000 units for entrances from offscreen. **Start speed** and **End speed** set each polygon’s approach speeds in units per second. The **Rotation offset** winds back to the charted direction with the same speed change. Polygons still arrive on beat.
 
 **Center rotation speed** turns the center polygon, target circle, and incoming polygons together in degrees per second. Positive values turn clockwise and negative values turn counterclockwise. The arena keeps its current angle when a zone changes the speed. Incoming polygons apply their own rotation offset on top.
 

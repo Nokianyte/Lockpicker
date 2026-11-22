@@ -4,19 +4,31 @@ signal song_ended
 
 const WEB_AUDIO := """
 window.lockpickerSongAudio ??= (function () {
-	let context, buffer, songId, source;
+	let context, gain, buffer, songId, source;
+	let volume = 1;
 	let started = 0, offset = 0, limit = 0;
+	function prepare() {
+		if (context) return;
+		context = new AudioContext();
+		gain = context.createGain();
+		gain.gain.value = volume;
+		gain.connect(context.destination);
+	}
 	function unlock() {
-		context ??= new AudioContext();
+		prepare();
 		context.resume().catch(() => {});
 	}
 	return {
 		unlock,
+		setVolume(level) {
+			volume = level;
+			if (gain) gain.gain.value = level;
+		},
 		hasSong(id) {
 			return songId === id;
 		},
 		loadPcm(id, encoded, rate, channels, bytesPerSample) {
-			context ??= new AudioContext();
+			prepare();
 			const decoded = atob(encoded);
 			const frameSize = channels * bytesPerSample;
 			buffer = context.createBuffer(channels, Math.floor(decoded.length / frameSize), rate);
@@ -39,7 +51,7 @@ window.lockpickerSongAudio ??= (function () {
 			unlock();
 			source = context.createBufferSource();
 			source.buffer = buffer;
-			source.connect(context.destination);
+			source.connect(gain);
 			started = context.currentTime;
 			offset = position;
 			limit = end;
@@ -104,6 +116,10 @@ func start_at(seconds: float) -> void:
 func unlock_audio() -> void:
 	if _web != null:
 		_web.unlock()
+
+func set_web_volume(level: float) -> void:
+	if _web != null:
+		_web.setVolume(level)
 
 func resume_song() -> void:
 	if running or song == null or _position >= playback_end:

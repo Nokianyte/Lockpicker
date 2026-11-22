@@ -1,6 +1,7 @@
 extends Control
 
 signal exit_requested
+signal settings_requested
 
 const Arena = preload("res://scripts/song_arena.gd")
 const Chart = preload("res://scripts/song_chart.gd")
@@ -43,6 +44,7 @@ func _ready() -> void:
 	var header := HBoxContainer.new()
 	content.add_child(header)
 	header.add_child(UI.button("‹ Back", _leave))
+	header.add_child(UI.button("Settings", settings_requested.emit))
 	_title = UI.label("", 21)
 	_title.size_flags_horizontal = SIZE_EXPAND_FILL
 	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -97,8 +99,7 @@ func _build_result() -> void:
 	_veil.hide()
 
 func start_run(chart: Chart, stream: AudioStreamWAV, cursor: float) -> void:
-	arena.approach_horizon = chart.approach_horizon()
-	arena.center_rotation_track = chart.center_rotation_track()
+	arena.configure(chart)
 	transport.load_song(stream)
 	var bounds := chart.playback_bounds(transport.duration())
 	transport.set_playback_range(bounds.start, bounds.end)

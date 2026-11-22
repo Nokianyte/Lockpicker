@@ -2,6 +2,8 @@
 
 The rhythm prototype opens by default. Choose **Charts** to make or play a song chart, or **Arcade** to switch to the endless mode.
 
+Open **Settings** to adjust the master volume. The setting is saved locally when you close the dialog.
+
 Scroll one notch or press the Left or Right Arrow to turn the innermost ring 60°. Line up its circle with the fixed red circle, then tap Z or X when both hexagons overlap on the beat.
 
 - **Z** and **X** are interchangeable. Either key starts the two-beat count-in, judges a tap during play, and resumes or replays from the corresponding screen. Each tap needs a fresh press.
@@ -23,9 +25,11 @@ Use **+ Zone** to add a zone at the playhead. Click its diamond to open its sett
 
 **Center rotation speed** turns the center polygon, target circle, and incoming polygons together in degrees per second. Positive values turn clockwise and negative values turn counterclockwise. The arena keeps its current angle when a zone changes the speed. Incoming polygons apply their own rotation offset on top.
 
+**Polygon start color** and **Polygon end color** tint incoming polygons as they travel. The color follows distance traveled, so it changes faster as the polygon speeds up. **Background color** changes the arena at the zone marker. Right-click any color swatch to restore its default.
+
 Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Use the mouse wheel or Left / Right Arrow to turn the innermost ring toward the target circle, then tap **Z** or **X** on the beat. Spikes are spiky circles and cost the same energy as a missed note if they line up with the target on their beat. Saved charts and their audio files stay in local game or browser storage.
 
-The center polygon and target circle have black outlines at rest. Both tint yellow for **Perfect** (within 35 ms), green for **Good** (within 70 ms), and red for a miss or spike hit. A miss or spike hit also flashes the screen edges red. **OK** hits within the 100 ms window count without a color flash.
+The center polygon and target circle have black outlines at rest on light backgrounds and light outlines on dark backgrounds. Both tint yellow for **Perfect** (within 35 ms), green for **Good** (within 70 ms), and red for a miss or spike hit. A miss or spike hit also flashes the screen edges red. **OK** hits within the 100 ms window count without a color flash.
 
 ## Run locally
 

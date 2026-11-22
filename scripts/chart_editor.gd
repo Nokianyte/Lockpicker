@@ -1,6 +1,7 @@
 extends Control
 
 signal game_requested
+signal settings_requested
 signal play_requested(chart, stream: AudioStreamWAV, cursor: float, from_editor: bool)
 
 const Arena = preload("res://scripts/song_arena.gd")
@@ -49,6 +50,7 @@ var _chart_settings: VBoxContainer
 var _zone_settings: VBoxContainer
 var _zone_time: Label
 var _zone_fields: Dictionary[String, SpinBox] = {}
+var _zone_colors: Dictionary[String, ColorPickerButton] = {}
 var _file_dialog: FileDialog
 var _leave_dialog: ConfirmationDialog
 
@@ -109,6 +111,7 @@ func _build_library() -> VBoxContainer:
 			game_requested.emit()
 	)
 	header.add_child(_back_to_game)
+	header.add_child(UI.button("Settings", settings_requested.emit))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -174,6 +177,7 @@ func _build_header() -> HBoxContainer:
 	var bar := HBoxContainer.new()
 	bar.add_child(UI.label("Level Editor", 23))
 	bar.add_child(UI.button("‹ Charts", _go_back))
+	bar.add_child(UI.button("Settings", settings_requested.emit))
 	_title = LineEdit.new()
 	_title.placeholder_text = "Chart name"
 	_title.max_length = 100
@@ -269,6 +273,9 @@ func _build_zone_settings() -> VBoxContainer:
 	_add_zone_field(fields, "Rotation offset", "rotation_offset", -360.0, 360.0, 0.1, "°", "Initial rotation relative to the charted direction.")
 	_add_zone_field(fields, "End speed", "end_speed", Chart.MIN_APPROACH_SPEED, Chart.MAX_APPROACH_SPEED, 1.0, "", "Approach speed at the end, in units per second.")
 	_add_zone_field(fields, "Center rotation speed", "center_rotation_speed", -Chart.MAX_CENTER_ROTATION_SPEED, Chart.MAX_CENTER_ROTATION_SPEED, 0.1, "°/s", "Rotates the entire arena during this zone. Positive values turn clockwise and negative values turn counterclockwise.")
+	_add_zone_color(fields, "Background color", "background_color")
+	_add_zone_color(fields, "Polygon start color", "polygon_start_color")
+	_add_zone_color(fields, "Polygon end color", "polygon_end_color")
 	_zone_settings.add_child(HSeparator.new())
 	_zone_settings.add_child(UI.label("Additional effects", 15, UI.MUTED))
 	_zone_settings.hide()
@@ -283,6 +290,24 @@ func _add_zone_field(parent: GridContainer, label: String, key: String, minimum:
 	field.value_changed.connect(_change_zone.bind(key))
 	parent.add_child(field)
 	_zone_fields[key] = field
+
+func _add_zone_color(parent: GridContainer, label: String, key: String) -> void:
+	parent.add_child(UI.label(label, 14))
+	var picker := ColorPickerButton.new()
+	picker.custom_minimum_size = Vector2(48, 28)
+	picker.size_flags_horizontal = SIZE_EXPAND_FILL
+	picker.edit_alpha = false
+	picker.get_picker().deferred_mode = true
+	picker.tooltip_text = label + ". Right-click to reset to the default."
+	picker.color_changed.connect(func(color: Color) -> void: _change_zone(color.to_html(false), key))
+	picker.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+			_change_zone(null, key)
+			_refresh_zone_settings()
+			picker.accept_event()
+	)
+	parent.add_child(picker)
+	_zone_colors[key] = picker
 
 func _build_transport() -> HBoxContainer:
 	var bar := HBoxContainer.new()
@@ -509,6 +534,8 @@ func _refresh_actions() -> void:
 	_delete_zone_button.disabled = _busy
 	for field in _zone_fields.values():
 		field.editable = not _busy
+	for picker in _zone_colors.values():
+		picker.disabled = _busy
 	_start_offset.editable = not _busy and not no_song
 	_end_offset.editable = not _busy and not no_song
 
@@ -530,8 +557,7 @@ func _timing_changed() -> void:
 func _refresh_schedule() -> void:
 	preview.events = chart.schedule(transport.playback_start, transport.playback_end)
 	preview.slider_turns = Session.build_slider_turns(preview.events)
-	preview.approach_horizon = chart.approach_horizon()
-	preview.center_rotation_track = chart.center_rotation_track()
+	preview.configure(chart)
 	preview.queue_redraw()
 
 func _remember_edit() -> void:
@@ -601,6 +627,8 @@ func _refresh_zone_settings() -> void:
 	_zone_time.text = UI.clock(chart.time_at(zone.beat))
 	for key in _zone_fields:
 		_zone_fields[key].set_value_no_signal(zone[key])
+	for key in _zone_colors:
+		_zone_colors[key].color = Chart.zone_color(zone, key, Chart.ZONE_COLOR_DEFAULTS[key])
 
 func _move_zone(index: int, beat: float) -> void:
 	if _busy or chart.zone_at(beat) >= 0:
@@ -612,13 +640,16 @@ func _move_zone(index: int, beat: float) -> void:
 	chart.sort_zones()
 	_after_zone_edit(chart.zone_at(beat))
 
-func _change_zone(value: float, key: String) -> void:
+func _change_zone(value: Variant, key: String) -> void:
 	var index := timeline.zone_selection
-	if _busy or index < 0:
+	if _busy or index < 0 or chart.zones[index].get(key) == value:
 		return
 	_remember_edit()
 	var zone := chart.zones[index].duplicate()
-	zone[key] = value
+	if value == null:
+		zone.erase(key)
+	else:
+		zone[key] = value
 	chart.zones[index] = zone
 	_set_dirty()
 	_refresh_schedule()

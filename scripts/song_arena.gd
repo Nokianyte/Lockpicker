@@ -20,6 +20,7 @@ var events: Array[Dictionary] = []
 var slider_turns: Array[Dictionary] = []
 var approach_horizon := Chart.DEFAULT_APPROACH
 var center_rotation_track: Array[Dictionary] = []
+var background_track: Array[Dictionary] = []
 var song_time := 0.0
 var session: Session
 var _grid := PackedVector2Array()
@@ -29,6 +30,11 @@ func _ready() -> void:
 	clip_contents = true
 	resized.connect(_build_grid)
 	_build_grid()
+
+func configure(chart: Chart) -> void:
+	approach_horizon = chart.approach_horizon()
+	center_rotation_track = chart.center_rotation_track()
+	background_track = chart.background_track()
 
 func _build_grid() -> void:
 	_grid.clear()
@@ -44,28 +50,36 @@ func _draw() -> void:
 		return
 	var marker_radius := MARKER_RADIUS * zoom
 	var slider_radius := maxf(MIN_SLIDER_RADIUS, marker_radius)
-	if not _grid.is_empty():
-		draw_multiline(_grid, Palette.BORDER)
 	var schedule := session.events if session != null else events
 	var turns := session.slider_turns if session != null else slider_turns
 	var at := session.time if session != null else song_time
+	var background := Chart.background_at(background_track, at)
+	var dark := background.get_luminance() < 0.30
+	var foreground := Palette.PAPER if dark else Palette.INK
+	var idle_ink := Palette.PAPER if dark else Palette.SONG_CORE
+	if background != Palette.SURFACE:
+		draw_rect(Rect2(Vector2.ZERO, size), background)
+	if not _grid.is_empty():
+		var grid_ink := Palette.BORDER if background == Palette.SURFACE else background.lerp(foreground, 0.18)
+		draw_multiline(_grid, grid_ink)
 	var rotation := Chart.center_rotation_at(center_rotation_track, at)
 	var target_angle := Session.center_angle_at(turns, at)
-	var tint := Palette.SONG_CORE
+	var tint := idle_ink
 	var age := INF
 	if session != null:
-		tint = JUDGMENT_COLORS.get(session.tint_judgment, Palette.SONG_CORE)
+		tint = JUDGMENT_COLORS.get(session.tint_judgment, idle_ink)
 		age = at - session.tint_at
 	var flash := 1.0 - smoothstep(FLASH_HOLD, FLASH_DURATION, age)
-	var core_ink := Palette.SONG_CORE.lerp(tint, flash)
+	var core_ink := idle_ink.lerp(tint, flash)
+	var core_outline := core_ink.lightened(0.16) if dark else core_ink.darkened(0.18)
 	var wash_opacity := lerpf(0.055, 0.14, flash)
 	# Draw in the same center-relative frame that judging uses.
 	draw_set_transform(size * 0.5, rotation)
-	_draw_core(zoom, target_angle, core_ink, wash_opacity)
+	_draw_core(zoom, target_angle, Color(core_ink, wash_opacity), core_outline)
 	# Keep approaching markers, especially slider arrows, above the target's fill.
 	var target := G.song_marker(T.SONG_CORE_RADIUS, target_angle) * zoom
-	draw_circle(target, marker_radius, Palette.SURFACE.lerp(core_ink, wash_opacity), true, -1.0, true)
-	draw_arc(target, marker_radius, 0.0, TAU, 40, core_ink.darkened(0.18), 2.0, true)
+	draw_circle(target, marker_radius, background.lerp(core_ink, wash_opacity), true, -1.0, true)
+	draw_arc(target, marker_radius, 0.0, TAU, 40, core_outline, 2.0, true)
 	var first := Session.first_event_at(schedule, at - Session.HIT_WINDOW)
 	# The hexagon's nearest edge can reach a corner before any of its vertices enter view.
 	var marker_margin := maxf(slider_radius, marker_radius * Art.SPIKE_TIP_SCALE) + 2.0
@@ -91,17 +105,19 @@ func _draw() -> void:
 			angle += session.turn_offset(index, at)
 		var marker := G.song_marker(radius, angle) * zoom
 		var visibility := lerpf(1.0, 0.29, approach)
+		var polygon_color := Chart.approach_color(motion, approach, Palette.SPIKE if event.spike else foreground)
 		if event.spike:
-			Art.ring(self, Vector2.ZERO, zoom, radius, angle, Color(Palette.SPIKE, visibility * 0.33), 1.0)
-			Art.spiky_circle(self, marker, marker_radius, angle, Color(Palette.SPIKE, visibility))
+			Art.ring(self, Vector2.ZERO, zoom, radius, angle, Color(polygon_color, visibility * 0.33), 1.0)
+			Art.spiky_circle(self, marker, marker_radius, angle, Color(polygon_color, visibility))
 		else:
 			var aligned := absf(remaining) <= Session.HIT_WINDOW and G.gap_accepts_tip(Session.note_target_angle(turns, event, at), angle)
-			var ink := Color(Palette.RED if aligned else Palette.INK, visibility)
+			var ink := Color(Palette.RED if aligned else polygon_color, visibility)
 			var width := lerpf(2.3, 1.0, approach)
-			Art.ring(self, Vector2.ZERO, zoom, radius, angle, ink, width)
+			var custom_color := motion.has("polygon_start_color") or motion.has("polygon_end_color")
+			Art.ring(self, Vector2.ZERO, zoom, radius, angle, Color(polygon_color, visibility) if custom_color else ink, width)
 			if event.has("slider_direction"):
 				var axis := Vector2(event.slider_direction, 0).rotated(-rotation)
-				draw_circle(marker, slider_radius * 0.82, Color(Palette.SURFACE, visibility), true, -1.0, true)
+				draw_circle(marker, slider_radius * 0.82, Color(background, visibility), true, -1.0, true)
 				Art.slider_marker(self, marker, slider_radius, axis, ink, maxf(width, slider_radius * 0.18))
 			else:
 				draw_arc(marker, marker_radius, 0.0, TAU, 40, ink, width, true)
@@ -110,9 +126,9 @@ func _draw() -> void:
 		var pulse_radius := marker_radius * lerpf(0.8, 2.2, progress)
 		draw_arc(target, pulse_radius, 0.0, TAU, 40, Color(tint, 1.0 - progress), 1.6, true)
 	if session != null:
-		_draw_combo(T.SONG_CORE_RADIUS * zoom)
+		_draw_combo(T.SONG_CORE_RADIUS * zoom, foreground, foreground.lerp(background, 0.35) if dark else Palette.MUTED)
 
-func _draw_combo(radius: float) -> void:
+func _draw_combo(radius: float, foreground: Color, muted: Color) -> void:
 	var font := get_theme_default_font()
 	var value := str(session.combo)
 	var width := radius * 1.45
@@ -124,17 +140,17 @@ func _draw_combo(radius: float) -> void:
 	var number_height := font.get_height(number_size)
 	var top := -(number_height + font.get_height(label_size)) * 0.5
 	var x := -width * 0.5
-	var number_ink := Palette.INK if session.combo > 0 else Palette.MUTED
+	var number_ink := foreground if session.combo > 0 else muted
 	# Keep text upright while the polygon and its target turn.
 	draw_set_transform(size * 0.5)
 	draw_string(font, Vector2(x, top + font.get_ascent(number_size)), value, HORIZONTAL_ALIGNMENT_CENTER, width, number_size, number_ink)
-	draw_string(font, Vector2(x, top + number_height + font.get_ascent(label_size)), "COMBO", HORIZONTAL_ALIGNMENT_CENTER, width, label_size, Palette.MUTED)
+	draw_string(font, Vector2(x, top + number_height + font.get_ascent(label_size)), "COMBO", HORIZONTAL_ALIGNMENT_CENTER, width, label_size, muted)
 
-func _draw_core(zoom: float, target_angle: float, ink: Color, wash_opacity: float) -> void:
+func _draw_core(zoom: float, target_angle: float, fill: Color, outline: Color) -> void:
 	var points := PackedVector2Array()
 	for side in 6:
 		var vertex := target_angle + PI / 6.0 + side * T.WHEEL_STEP
 		points.append(Vector2.from_angle(vertex) * T.SONG_CORE_RADIUS * zoom)
-	draw_colored_polygon(points, Color(ink, wash_opacity))
+	draw_colored_polygon(points, fill)
 	points.append(points[0])
-	draw_polyline(points, ink.darkened(0.18), 2.5, true)
+	draw_polyline(points, outline, 2.5, true)

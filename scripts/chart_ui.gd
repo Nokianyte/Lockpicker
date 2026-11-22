@@ -65,6 +65,7 @@ static func theme() -> Theme:
 		result.set_color(arrow + "_pressed_icon_modulate", "SpinBox", ACCENT)
 	result.set_constant("modulate_arrow", "OptionButton", 1)
 	result.set_stylebox("panel", "PopupMenu", box(Palette.SURFACE, Palette.BORDER, 5))
+	result.set_stylebox("panel", "PopupPanel", box(Palette.SURFACE, Palette.BORDER, 8))
 	result.set_stylebox("hover", "PopupMenu", box(Palette.RED_WASH, Palette.LINE))
 	result.set_color("font_color", "PopupMenu", INK)
 	result.set_color("font_hover_color", "PopupMenu", INK)

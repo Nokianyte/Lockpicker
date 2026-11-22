@@ -1,6 +1,7 @@
 extends RefCounted
 
 const T = preload("res://scripts/tuning.gd")
+const Palette = preload("res://scripts/palette.gd")
 const VERSION := 1
 const MIN_BPM := 10.0
 const MAX_BPM := 600.0
@@ -14,6 +15,11 @@ const MIN_APPROACH_SPEED := 30.0
 const MAX_APPROACH_SPEED := 2000.0
 const DEFAULT_APPROACH_SPEED := 176.0
 const MAX_CENTER_ROTATION_SPEED := 3600.0
+const ZONE_COLOR_DEFAULTS := {
+	"polygon_start_color": Palette.INK,
+	"polygon_end_color": Palette.INK,
+	"background_color": Palette.SURFACE,
+}
 
 var id := new_id()
 var title := "Untitled chart"
@@ -87,6 +93,30 @@ func center_rotation_track() -> Array[Dictionary]:
 	return track
 
 static func center_rotation_at(track: Array[Dictionary], at: float) -> float:
+	var index := _segment_at(track, at)
+	if index < 0:
+		return 0.0
+	var segment := track[index]
+	return fposmod(float(segment.angle) + (at - float(segment.time)) * float(segment.speed), TAU)
+
+func background_track() -> Array[Dictionary]:
+	var track: Array[Dictionary] = []
+	var last_color := Palette.SURFACE
+	for zone in zones:
+		var color := zone_color(zone, "background_color", Palette.SURFACE)
+		if color != last_color:
+			track.append({"time": time_at(zone.beat), "color": color})
+			last_color = color
+	return track
+
+static func background_at(track: Array[Dictionary], at: float) -> Color:
+	var index := _segment_at(track, at)
+	return Palette.SURFACE if index < 0 else track[index].color
+
+static func zone_color(zone: Dictionary, key: String, fallback: Color) -> Color:
+	return Color.html(zone[key]) if zone.has(key) else fallback
+
+static func _segment_at(track: Array[Dictionary], at: float) -> int:
 	var low := 0
 	var high := track.size()
 	while low < high:
@@ -95,10 +125,7 @@ static func center_rotation_at(track: Array[Dictionary], at: float) -> float:
 			low = middle + 1
 		else:
 			high = middle
-	if low == 0:
-		return 0.0
-	var segment := track[low - 1]
-	return fposmod(float(segment.angle) + (at - float(segment.time)) * float(segment.speed), TAU)
+	return low - 1
 
 func approach_horizon() -> float:
 	var horizon := DEFAULT_APPROACH
@@ -121,6 +148,10 @@ static func remaining_approach(event: Dictionary, at: float) -> float:
 static func approach_angle(event: Dictionary, remaining: float) -> float:
 	var motion: Dictionary = event.get("motion", {})
 	return direction_angle(event.lane) + float(motion.get("rotation", 0.0)) * remaining
+
+static func approach_color(motion: Dictionary, remaining: float, fallback: Color) -> Color:
+	var end: Color = motion.get("polygon_end_color", fallback)
+	return end.lerp(motion.get("polygon_start_color", fallback), remaining)
 
 static func max_song_offset(length: float, other_offset: float = 0.0) -> float:
 	return maxf(0.0, length - MIN_PLAYBACK_SECONDS - other_offset)
@@ -150,6 +181,9 @@ func schedule(start: float = -INF, end: float = INF) -> Array[Dictionary]:
 				"acceleration": (float(zone.end_speed) - float(zone.start_speed)) / (float(zone.end_speed) + float(zone.start_speed)),
 				"rotation": deg_to_rad(zone.rotation_offset),
 			}
+			for key in ["polygon_start_color", "polygon_end_color"]:
+				if zone.has(key):
+					motion[key] = Color.html(zone[key])
 			index += 1
 		if not motion.is_empty():
 			event.motion = motion
@@ -224,11 +258,18 @@ static func from_record(record: Variant) -> RefCounted:
 		var center_speed: Variant = zone.get("center_rotation_speed", 0.0)
 		if not number_between(center_speed, -MAX_CENTER_ROTATION_SPEED, MAX_CENTER_ROTATION_SPEED):
 			return null
-		chart.zones.append({
+		var settings := {
 			"beat": float(zone.beat), "spawn_radius": float(zone.spawn_radius),
 			"start_speed": float(zone.start_speed), "end_speed": float(zone.end_speed),
 			"rotation_offset": float(zone.rotation_offset), "center_rotation_speed": float(center_speed),
-		})
+		}
+		for key in ZONE_COLOR_DEFAULTS:
+			if zone.has(key):
+				var color: Variant = zone[key]
+				if not color is String or color.length() != 6 or not Color.html_is_valid(color):
+					return null
+				settings[key] = color.to_lower()
+		chart.zones.append(settings)
 	chart.sort_zones()
 	for index in range(1, chart.zones.size()):
 		if float(chart.zones[index].beat) - float(chart.zones[index - 1].beat) < 0.000001:

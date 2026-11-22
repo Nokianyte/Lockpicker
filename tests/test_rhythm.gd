@@ -6,6 +6,7 @@ const Library = preload("res://scripts/chart_library.gd")
 const Session = preload("res://scripts/song_session.gd")
 const T = preload("res://scripts/tuning.gd")
 const G = preload("res://scripts/wall_geometry.gd")
+const Palette = preload("res://scripts/palette.gd")
 
 var _checks := 0
 var _failed := 0
@@ -181,6 +182,37 @@ func _check_center_rotation() -> void:
 	_check(is_equal_approx(Chart.center_rotation_at(track, 5.0), PI / 4.0), "A zero-speed zone must hold the angle reached by the previous zone.")
 	_check(is_equal_approx(Chart.center_rotation_at(track, 1.5), PI / 4.0), "A backward seek must reproduce the angle at that song time.")
 
+func _check_zone_colors() -> void:
+	var chart := Chart.new()
+	chart.audio_id = Chart.new_id()
+	chart.zones = [Chart.new_zone(2.0), Chart.new_zone(8.0)]
+	var zone := chart.zones[0]
+	zone.spawn_radius = 300.0
+	zone.start_speed = 50.0
+	zone.end_speed = 150.0
+	zone.polygon_start_color = "ff0000"
+	zone.polygon_end_color = "0000ff"
+	zone.background_color = "101820"
+	chart.events = [{"beat": 6.0, "lane": 0, "spike": false}]
+	var event := chart.schedule()[0]
+	_check(Chart.approach_color(event.motion, 1.0, Palette.INK) == Color.RED and Chart.approach_color(event.motion, 0.0, Palette.INK) == Color.BLUE, "Color endpoints must match the zone settings.")
+	var halfway := Chart.approach_color(event.motion, Chart.remaining_approach(event, 2.0), Palette.INK)
+	_check(halfway.is_equal_approx(Color(0.625, 0.0, 0.375)), "Accelerating polygons must also change color faster as they approach.")
+	var background := chart.background_track()
+	_check(Chart.background_at(background, 0.99) == Palette.SURFACE and Chart.background_at(background, 1.0) == Color("101820") and Chart.background_at(background, 4.0) == Palette.SURFACE, "Background changes must follow zone boundaries and restore the default for an unset zone.")
+	_check(Chart.from_record(chart.record()).record() == chart.record(), "All three zone colors must survive saving and reopening.")
+	zone.background_color = "bad value"
+	_check(Chart.from_record(chart.record()) == null, "Invalid zone colors must be rejected.")
+
+func _check_master_volume(app) -> void:
+	var bus := AudioServer.get_bus_index("Master")
+	var initial: float = app._volume_slider.value
+	app._volume_slider.value = 25
+	_check(is_equal_approx(AudioServer.get_bus_volume_db(bus), linear_to_db(0.25)) and not AudioServer.is_bus_mute(bus), "The master volume slider must set the mixer level.")
+	app._volume_slider.value = 0
+	_check(AudioServer.is_bus_mute(bus), "Zero volume must mute the master bus.")
+	app._volume_slider.value = initial
+
 func _wav() -> PackedByteArray:
 	var format := AudioStreamWAV.new()
 	format.mix_rate = 8000
@@ -352,6 +384,7 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	editor._zone_fields.rotation_offset.value = -120.0
 	editor._zone_fields.start_speed.value = 80.0
 	editor._zone_fields.center_rotation_speed.value = 120.0
+	editor._zone_colors.background_color.color_changed.emit(Color("24364a"))
 	editor._select_zone(-1)
 	var click := InputEventMouseButton.new()
 	click.position = Vector2(editor.timeline._x_at(2.0), editor.timeline.ZONE_HANDLE_Y)
@@ -366,6 +399,7 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	editor._play(false)
 	_check(app.song.session.events[0].motion.rotation == editor.preview.events[0].motion.rotation, "Playtest and editor preview must share the zone's motion profile.")
 	_check(app.song.arena.center_rotation_track == editor.preview.center_rotation_track and is_equal_approx(Chart.center_rotation_at(app.song.arena.center_rotation_track, 2.75), PI / 6.0), "Playtest and preview must share the arena angle at a given song time.")
+	_check(app.song.arena.background_track == editor.preview.background_track and Chart.background_at(app.song.arena.background_track, 2.75) == Color("24364a"), "Playtest and preview must share the edited zone background.")
 	app.song._leave()
 	editor._delete_zone_button.pressed.emit()
 	_check(chart.zones.is_empty() and editor._chart_settings.visible and chart.events.size() == 1, "Deleting a zone must restore chart settings and preserve its notes and spikes.")
@@ -392,8 +426,10 @@ func _run() -> void:
 	_check_sliders()
 	_check_zone_motion()
 	_check_center_rotation()
+	_check_zone_colors()
 	var app := AppScene.instantiate()
 	root.add_child(app)
+	_check_master_volume(app)
 	var arguments := OS.get_cmdline_user_args()
 	var wav := _wav()
 	await _check_storage(app.editor.library, arguments, wav)

@@ -39,7 +39,10 @@ static func spiky_circle(canvas: CanvasItem, center: Vector2, radius: float, ang
 
 static func slider_marker(canvas: CanvasItem, center: Vector2, radius: float, axis: Vector2, ink: Color, width: float) -> void:
 	canvas.draw_arc(center, radius, 0.0, TAU, 24, ink, width, true)
-	var tip := center + axis * radius * 0.62
-	var wing := axis.orthogonal() * radius * 0.33
-	canvas.draw_line(center - axis * radius * 0.62, tip, ink, width, true)
+	direction_arrow(canvas, center, axis, radius * 0.62, ink, width)
+
+static func direction_arrow(canvas: CanvasItem, center: Vector2, axis: Vector2, length: float, ink: Color, width: float) -> void:
+	var tip := center + axis * length
+	var wing := axis.orthogonal() * length * 0.53
+	canvas.draw_line(center - axis * length, tip, ink, width, true)
 	canvas.draw_polyline(PackedVector2Array([center + wing, tip, center - wing]), ink, width, true)

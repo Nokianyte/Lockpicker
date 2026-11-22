@@ -4,6 +4,7 @@ const PAPER := Color("f9f8f4")
 const INK := Color("252325")
 const MUTED := Color("6d6667")
 const RED := Color("d8243d")
+const SLIDER_BLUE := Color("235ec4")
 const SPIKE := Color("a84b24")
 const SONG_CORE := Color("111111")
 const PERFECT := Color("ffd447")
@@ -18,3 +19,6 @@ const WAVEFORM := Color("dbcbbd")
 const RED_WASH := Color("f7ebe9")
 const RED_HOVER := Color("f4dce0")
 const RED_PRESSED := Color("eed0d5")
+
+static func slider_color(direction: int) -> Color:
+	return RED if direction < 0 else SLIDER_BLUE

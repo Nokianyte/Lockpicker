@@ -11,15 +11,19 @@ signal zone_moved(index: int, beat: float)
 const Chart = preload("res://scripts/song_chart.gd")
 const Art = preload("res://scripts/arena_art.gd")
 const Palette = preload("res://scripts/palette.gd")
+const Session = preload("res://scripts/song_session.gd")
+const T = preload("res://scripts/tuning.gd")
 const LEFT := 59.0
 const RULER := 36.0
 const RIGHT := 12.0
 const BOTTOM := 16.0
+const TARGET_ROW := 26.0
 const ZONE_HANDLE_Y := 30.0
 
 enum Placement { NOTE, SPIKE, SLIDER_LEFT, SLIDER_RIGHT }
 
 var chart: Chart
+var slider_turns: Array[Dictionary] = []
 var waveform: PackedFloat32Array
 var waveform_completed := 0
 var waveform_bins_per_second := 0.0
@@ -67,7 +71,7 @@ func _plot_width() -> float:
 	return maxf(1.0, size.x - LEFT - RIGHT)
 
 func _plot_height() -> float:
-	return maxf(1.0, size.y - RULER - BOTTOM)
+	return maxf(1.0, size.y - RULER - TARGET_ROW - BOTTOM)
 
 func _x_at(time: float) -> float:
 	return LEFT + (time - start_time) * _plot_width() / span
@@ -97,12 +101,7 @@ func _draw() -> void:
 	for lane in 6:
 		var axis := Vector2.from_angle(Chart.direction_angle(lane))
 		var center := Vector2(LEFT * 0.5, _y_at(lane))
-		var tip := center + axis * 8.0
-		var shoulder := tip - axis * 5.5
-		var width := axis.orthogonal() * 4.0
-		var ink := Palette.MUTED
-		draw_line(center - axis * 7.0, tip, ink, 1.5, true)
-		draw_polyline(PackedVector2Array([shoulder + width, tip, shoulder - width]), ink, 1.5, true)
+		Art.direction_arrow(self, center, axis, 8.0, Palette.MUTED, 1.5)
 	draw_line(Vector2(LEFT, 0), Vector2(LEFT, plot.end.y), Palette.RULE)
 	for index in chart.events.size():
 		var item := chart.events[index]
@@ -115,10 +114,50 @@ func _draw() -> void:
 			_draw_marker(Vector2(x, _y_at(_lane_at(_drag_position.y))), chart.events[_drag_index], true)
 	_draw_trimmed_ranges(plot)
 	_draw_zones(plot)
+	_draw_target_row(plot)
 	var cursor_x := _x_at(playhead)
 	if cursor_x >= LEFT and cursor_x <= plot.end.x:
-		draw_line(Vector2(cursor_x, 5), Vector2(cursor_x, plot.end.y), Palette.RED, 1.5)
+		draw_line(Vector2(cursor_x, 5), Vector2(cursor_x, plot.end.y + TARGET_ROW), Palette.RED, 1.5)
 		draw_colored_polygon(PackedVector2Array([Vector2(cursor_x - 5, 4), Vector2(cursor_x + 5, 4), Vector2(cursor_x, 11)]), Palette.RED)
+		if playback_start < playback_end:
+			var marker := Vector2(cursor_x, plot.end.y + TARGET_ROW * 0.5)
+			draw_circle(marker, 10.0, Palette.SURFACE, true, -1.0, true)
+			draw_arc(marker, 10.0, 0.0, TAU, 24, Palette.RULE, 1.2, true)
+			_draw_target_arrow(marker, playhead, Palette.INK)
+
+func _draw_target_row(plot: Rect2) -> void:
+	var row := Rect2(0.0, plot.end.y, plot.end.x, TARGET_ROW)
+	var center_y := row.get_center().y
+	draw_rect(row, Palette.PANEL)
+	draw_line(row.position, Vector2(row.end.x, row.position.y), Palette.RULE)
+	draw_line(Vector2(LEFT, row.position.y), Vector2(LEFT, row.end.y), Palette.RULE)
+	draw_line(Vector2(0.0, row.end.y), row.end, Palette.BORDER)
+	draw_string(ThemeDB.fallback_font, Vector2(0.0, center_y + 4.0), "Target", HORIZONTAL_ALIGNMENT_CENTER, LEFT, 12, Palette.MUTED)
+	var first := maxf(LEFT, _x_at(playback_start))
+	var last := minf(row.end.x, _x_at(playback_end))
+	if last <= first:
+		return
+	var turn_index := Session.first_event_at(slider_turns, _time_at(first) - T.TURN_DURATION)
+	for index in range(turn_index, slider_turns.size()):
+		var time: float = slider_turns[index].time
+		var x := _x_at(time)
+		if x >= last:
+			break
+		var start := maxf(first, x)
+		var end := minf(last, _x_at(time + T.TURN_DURATION))
+		if end > start:
+			draw_rect(Rect2(start, row.position.y + 1.0, end - start, TARGET_ROW - 1.0), Palette.LINE)
+		if x >= first:
+			draw_line(Vector2(x, row.position.y), Vector2(x, row.end.y), Palette.RULE)
+	var cursor_x := _x_at(playhead)
+	for x in range(ceili(first + 14.0), floori(last - 7.0), 38):
+		if absf(x - cursor_x) >= 18.0:
+			_draw_target_arrow(Vector2(x, center_y), _time_at(x), Palette.MUTED)
+
+func _draw_target_arrow(point: Vector2, time: float, ink: Color) -> void:
+	# The arena and chart lanes share the zone's spin, so only sliders change the target's lane.
+	var axis := Vector2.from_angle(Session.center_angle_at(slider_turns, time))
+	Art.direction_arrow(self, point, axis, 6.5, ink, 1.5)
 
 func _draw_zones(plot: Rect2) -> void:
 	for index in chart.zones.size():
@@ -208,7 +247,7 @@ func _draw_marker(point: Vector2, item: Dictionary, highlighted: bool) -> void:
 	if item.spike:
 		Art.spiky_circle(self, point, 5.6, -PI / 2.0, Palette.SPIKE)
 	elif item.has("slider_direction"):
-		Art.slider_marker(self, point, 7.0, Vector2(item.slider_direction, 0), Palette.INK, 1.4)
+		Art.slider_marker(self, point, 7.0, Vector2(item.slider_direction, 0), Palette.slider_color(item.slider_direction), 1.4)
 	else:
 		draw_circle(point, 6.0, Palette.INK, true, -1, true)
 
@@ -291,6 +330,8 @@ func _click(event: InputEventMouseButton) -> void:
 					Placement.SLIDER_LEFT: direction = -1
 					Placement.SLIDER_RIGHT: direction = 1
 				placed.emit(beat, lane, tool == Placement.SPIKE, direction)
+	elif point.y < RULER + _plot_height() + TARGET_ROW and event.button_index == MOUSE_BUTTON_LEFT:
+		sought.emit(clampf(_time_at(point.x), 0.0, duration))
 
 func _valid_beat(beat: float) -> bool:
 	var time := chart.time_at(beat)

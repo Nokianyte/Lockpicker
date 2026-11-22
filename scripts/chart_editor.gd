@@ -557,8 +557,10 @@ func _timing_changed() -> void:
 func _refresh_schedule() -> void:
 	preview.events = chart.schedule(transport.playback_start, transport.playback_end)
 	preview.slider_turns = Session.build_slider_turns(preview.events)
+	timeline.slider_turns = preview.slider_turns
 	preview.configure(chart)
 	preview.queue_redraw()
+	timeline.queue_redraw()
 
 func _remember_edit() -> void:
 	_undo.append({"events": chart.events.duplicate(), "zones": chart.zones.duplicate()})

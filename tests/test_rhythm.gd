@@ -418,6 +418,12 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	timeline.moved.emit(1, 9.0, 4)
 	_check(editor.preview.events.back().slider_direction == 1 and chart.events.back().lane == 4, "Moving a slider must preserve its arrow and update preview.")
 	_check(is_equal_approx(Session.center_angle_at(editor.preview.slider_turns, 4.7), T.TIP_ANGLE + T.WHEEL_STEP), "Editor preview must apply the slider turn at its moved time.")
+	_check(timeline.slider_turns == editor.preview.slider_turns, "The timeline and preview must share the same slider turns.")
+	click.position = Vector2(timeline._x_at(4.7), timeline.RULER + timeline._plot_height() + timeline.TARGET_ROW * 0.5)
+	timeline._gui_input(click)
+	_check(is_equal_approx(timeline.playhead, 4.7), "Clicking the Target row must seek without placing an event.")
+	editor._start_offset.value = 4.6
+	_check(timeline.slider_turns.is_empty(), "The Target row must ignore sliders trimmed out of playback.")
 
 func _run() -> void:
 	_check_judgment()

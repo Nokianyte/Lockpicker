@@ -111,14 +111,16 @@ func _draw() -> void:
 			Art.spiky_circle(self, marker, marker_radius, angle, Color(polygon_color, visibility))
 		else:
 			var aligned := absf(remaining) <= Session.HIT_WINDOW and G.gap_accepts_tip(Session.note_target_angle(turns, event, at), angle)
-			var ink := Color(Palette.RED if aligned else polygon_color, visibility)
+			var direction: int = event.get("slider_direction", 0)
+			var aim_color := Palette.slider_color(direction) if direction != 0 else Palette.RED
+			var ink := Color(aim_color if aligned else polygon_color, visibility)
 			var width := lerpf(2.3, 1.0, approach)
 			var custom_color := motion.has("polygon_start_color") or motion.has("polygon_end_color")
 			Art.ring(self, Vector2.ZERO, zoom, radius, angle, Color(polygon_color, visibility) if custom_color else ink, width)
-			if event.has("slider_direction"):
-				var axis := Vector2(event.slider_direction, 0).rotated(-rotation)
-				draw_circle(marker, slider_radius * 0.82, Color(background, visibility), true, -1.0, true)
-				Art.slider_marker(self, marker, slider_radius, axis, ink, maxf(width, slider_radius * 0.18))
+			if direction != 0:
+				var axis := Vector2(direction, 0).rotated(-rotation)
+				draw_circle(marker, slider_radius, Color(Palette.SURFACE, visibility), true, -1.0, true)
+				Art.slider_marker(self, marker, slider_radius, axis, Color(aim_color, visibility), maxf(width, slider_radius * 0.18))
 			else:
 				draw_arc(marker, marker_radius, 0.0, TAU, 40, ink, width, true)
 	if session != null and session.tint_judgment != Session.Judgment.MISS and age < T.BREAK_TIME:

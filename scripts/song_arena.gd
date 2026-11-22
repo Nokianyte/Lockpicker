@@ -109,6 +109,26 @@ func _draw() -> void:
 		var progress := age / T.BREAK_TIME
 		var pulse_radius := marker_radius * lerpf(0.8, 2.2, progress)
 		draw_arc(target, pulse_radius, 0.0, TAU, 40, Color(tint, 1.0 - progress), 1.6, true)
+	if session != null:
+		_draw_combo(T.SONG_CORE_RADIUS * zoom)
+
+func _draw_combo(radius: float) -> void:
+	var font := get_theme_default_font()
+	var value := str(session.combo)
+	var width := radius * 1.45
+	var number_size := maxi(1, roundi(radius * 0.60))
+	var value_width := font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, number_size).x
+	if value_width > width:
+		number_size = maxi(1, floori(number_size * width / value_width))
+	var label_size := maxi(1, roundi(radius * 0.17))
+	var number_height := font.get_height(number_size)
+	var top := -(number_height + font.get_height(label_size)) * 0.5
+	var x := -width * 0.5
+	var number_ink := Palette.INK if session.combo > 0 else Palette.MUTED
+	# Keep text upright while the polygon and its target turn.
+	draw_set_transform(size * 0.5)
+	draw_string(font, Vector2(x, top + font.get_ascent(number_size)), value, HORIZONTAL_ALIGNMENT_CENTER, width, number_size, number_ink)
+	draw_string(font, Vector2(x, top + number_height + font.get_ascent(label_size)), "COMBO", HORIZONTAL_ALIGNMENT_CENTER, width, label_size, Palette.MUTED)
 
 func _draw_core(zoom: float, target_angle: float, ink: Color, wash_opacity: float) -> void:
 	var points := PackedVector2Array()

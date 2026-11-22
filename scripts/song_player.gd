@@ -18,7 +18,7 @@ var _cursor := 0.0
 var _paused := false
 var _finished := false
 var _title: Label
-var _counts: Label
+var _hit_count: Label
 var _feedback: Label
 var _energy: ProgressBar
 var _veil: ColorRect
@@ -47,8 +47,8 @@ func _ready() -> void:
 	_title.size_flags_horizontal = SIZE_EXPAND_FILL
 	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	header.add_child(_title)
-	_counts = UI.label("", 16)
-	header.add_child(_counts)
+	_hit_count = UI.label("", 16)
+	header.add_child(_hit_count)
 	_energy = ProgressBar.new()
 	_energy.max_value = Session.MAX_ENERGY
 	_energy.show_percentage = false
@@ -209,7 +209,7 @@ func _leave() -> void:
 
 func _update_view() -> void:
 	arena.queue_redraw()
-	_counts.text = "%d hits    %d combo" % [session.hits, session.combo]
+	_hit_count.text = "%d hits" % session.hits
 	_energy.value = session.energy
 	_feedback.text = session.feedback if session.time - session.feedback_at < 0.65 else ""
 

@@ -20,6 +20,7 @@ var events: Array[Dictionary] = []
 var slider_turns: Array[Dictionary] = []
 var approach_horizon := Chart.DEFAULT_APPROACH
 var center_rotation_track: Array[Dictionary] = []
+var center_layout_track: Array[Dictionary] = []
 var background_track: Array[Dictionary] = []
 var input_circle_track: Array[Dictionary] = []
 var song_time := 0.0
@@ -35,6 +36,7 @@ func _ready() -> void:
 func configure(chart: Chart) -> void:
 	approach_horizon = chart.approach_horizon()
 	center_rotation_track = chart.center_rotation_track()
+	center_layout_track = chart.center_layout_track()
 	background_track = chart.background_track()
 	input_circle_track = chart.input_circle_track()
 
@@ -50,11 +52,14 @@ func _draw() -> void:
 	var zoom := minf(size.x, size.y) / (T.OUTER_RADIUS * 2.24)
 	if zoom <= 0.0:
 		return
-	var marker_radius := MARKER_RADIUS * zoom
-	var slider_radius := maxf(MIN_SLIDER_RADIUS, marker_radius)
 	var schedule := session.events if session != null else events
 	var turns := session.slider_turns if session != null else slider_turns
 	var at := session.time if session != null else song_time
+	var layout := Chart.center_layout_at(center_layout_track, at) / 100.0
+	var center := size * Vector2(layout.x, layout.y)
+	var core_radius := T.SONG_CORE_RADIUS * layout.z
+	var marker_radius := MARKER_RADIUS * zoom * layout.z
+	var slider_radius := maxf(MIN_SLIDER_RADIUS * layout.z, marker_radius)
 	var background := Chart.background_at(background_track, at)
 	var dark := background.get_luminance() < 0.30
 	var foreground := Palette.PAPER if dark else Palette.INK
@@ -77,20 +82,21 @@ func _draw() -> void:
 	var core_outline := core_ink.lightened(0.16) if dark else core_ink.darkened(0.18)
 	var wash_opacity := lerpf(0.055, 0.14, flash)
 	# Draw in the same center-relative frame that judging uses.
-	draw_set_transform(size * 0.5, rotation)
-	_draw_core(zoom, target_angle, Color(core_ink, wash_opacity), core_outline)
+	draw_set_transform(center, rotation)
+	_draw_core(core_radius * zoom, target_angle, Color(core_ink, wash_opacity), core_outline)
 	# Keep approaching markers, especially slider arrows, above the target's fill.
 	var input_fill := background.lerp(core_ink, wash_opacity)
 	for side in Chart.DIRECTIONS.size():
 		if (input_mask & (1 << side)) != 0:
-			var target := G.song_marker(T.SONG_CORE_RADIUS, G.input_angle(target_angle, side)) * zoom
+			var target := G.song_marker(core_radius, G.input_angle(target_angle, side)) * zoom
 			draw_circle(target, marker_radius, input_fill, true, -1.0, true)
 			draw_arc(target, marker_radius, 0.0, TAU, 40, core_outline, 2.0, true)
 	var first := Session.first_event_at(schedule, at - Session.HIT_WINDOW)
 	# The hexagon's nearest edge can reach a corner before any of its vertices enter view.
 	var marker_margin := maxf(slider_radius, marker_radius * Art.SPIKE_TIP_SCALE) + 2.0
-	var visible_radius := (size.length() * 0.5 + marker_margin) / (zoom * cos(PI / 6.0))
-	var visible_horizon := (visible_radius - T.SONG_CORE_RADIUS) / Chart.MIN_APPROACH_SPEED
+	var farthest_corner_distance := center.max(size - center).length()
+	var visible_radius := (farthest_corner_distance + marker_margin) / (zoom * cos(PI / 6.0))
+	var visible_horizon := (visible_radius - core_radius) / Chart.MIN_APPROACH_SPEED
 	var stop := Session.first_event_at(schedule, at + minf(approach_horizon, visible_horizon))
 	var spikes: Array[Dictionary] = []
 	for index in range(stop - 1, first - 1, -1):
@@ -104,7 +110,9 @@ func _draw() -> void:
 		if approach >= 1.0:
 			continue
 		var motion: Dictionary = event.get("motion", {})
-		var radius := lerpf(T.SONG_CORE_RADIUS, motion.get("spawn_radius", T.OUTER_RADIUS), approach)
+		# Keep the charted travel distance and land on the current center radius.
+		var travel := float(motion.get("spawn_radius", T.OUTER_RADIUS)) - T.SONG_CORE_RADIUS
+		var radius := core_radius + travel * approach
 		if radius > visible_radius:
 			continue
 		var angle := Chart.approach_angle(event, approach)
@@ -139,12 +147,12 @@ func _draw() -> void:
 		var pulse_radius := marker_radius * lerpf(0.8, 2.2, progress)
 		for side in Chart.DIRECTIONS.size():
 			if (pulsing_sides & (1 << side)) != 0:
-				var target := G.song_marker(T.SONG_CORE_RADIUS, G.input_angle(target_angle, side)) * zoom
+				var target := G.song_marker(core_radius, G.input_angle(target_angle, side)) * zoom
 				draw_arc(target, pulse_radius, 0.0, TAU, 40, Color(tint, 1.0 - progress), 1.6, true)
 	if session != null:
-		_draw_combo(T.SONG_CORE_RADIUS * zoom, foreground, foreground.lerp(background, 0.35) if dark else Palette.MUTED)
+		_draw_combo(center, core_radius * zoom, foreground, foreground.lerp(background, 0.35) if dark else Palette.MUTED)
 
-func _draw_combo(radius: float, foreground: Color, muted: Color) -> void:
+func _draw_combo(center: Vector2, radius: float, foreground: Color, muted: Color) -> void:
 	var font := get_theme_default_font()
 	var value := str(session.combo)
 	var width := radius * 1.45
@@ -158,15 +166,15 @@ func _draw_combo(radius: float, foreground: Color, muted: Color) -> void:
 	var x := -width * 0.5
 	var number_ink := foreground if session.combo > 0 else muted
 	# Keep text upright while the polygon and its target turn.
-	draw_set_transform(size * 0.5)
+	draw_set_transform(center)
 	draw_string(font, Vector2(x, top + font.get_ascent(number_size)), value, HORIZONTAL_ALIGNMENT_CENTER, width, number_size, number_ink)
 	draw_string(font, Vector2(x, top + number_height + font.get_ascent(label_size)), "COMBO", HORIZONTAL_ALIGNMENT_CENTER, width, label_size, muted)
 
-func _draw_core(zoom: float, target_angle: float, fill: Color, outline: Color) -> void:
+func _draw_core(radius: float, target_angle: float, fill: Color, outline: Color) -> void:
 	var points := PackedVector2Array()
 	for side in 6:
 		var vertex := target_angle + PI / 6.0 + side * T.WHEEL_STEP
-		points.append(Vector2.from_angle(vertex) * T.SONG_CORE_RADIUS * zoom)
+		points.append(Vector2.from_angle(vertex) * radius)
 	draw_colored_polygon(points, fill)
 	points.append(points[0])
 	draw_polyline(points, outline, 2.5, true)

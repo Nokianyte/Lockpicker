@@ -220,6 +220,24 @@ func _check_center_rotation() -> void:
 	_check(is_equal_approx(Chart.center_rotation_at(track, 5.0), PI / 4.0), "A zero-speed zone must hold the angle reached by the previous zone.")
 	_check(is_equal_approx(Chart.center_rotation_at(track, 1.5), PI / 4.0), "A backward seek must reproduce the angle at that song time.")
 
+func _check_center_layout() -> void:
+	var chart := Chart.new()
+	chart.zones = [Chart.new_zone(2.0)]
+	chart.zones[0].center_x = 100.0
+	chart.zones[0].center_y = 0.0
+	chart.zones[0].center_size = 200.0
+	chart.zones[0].center_transition = 2.0
+	chart.insert_zone(3.0)
+	chart.insert_zone(4.0)
+	chart.zones[2].center_x = 0.0
+	chart.zones[2].center_transition = 1.0
+	chart.zones.append(Chart.new_zone(8.0))
+	var track := chart.center_layout_track()
+	_check(Chart.center_layout_at(track, 0.99) == Chart.DEFAULT_CENTER_LAYOUT and Chart.center_layout_at(track, 1.0) == Chart.DEFAULT_CENTER_LAYOUT, "A center transition must start from the current layout at its marker.")
+	_check(Chart.center_layout_at(track, 2.0) == Vector3(75.0, 25.0, 150.0), "An inherited marker must let the current position and size transition continue.")
+	_check(Chart.center_layout_at(track, 2.5) == Vector3(37.5, 12.5, 175.0) and Chart.center_layout_at(track, 3.0) == Vector3(0.0, 0.0, 200.0), "A new target must start from the in-progress layout and arrive after its full duration.")
+	_check(Chart.center_layout_at(track, 4.0) == Chart.DEFAULT_CENTER_LAYOUT and Chart.center_layout_at(track, 2.0) == Vector3(75.0, 25.0, 150.0), "Instant transitions and backward seeks must produce the layout for the requested song time.")
+
 func _check_zone_colors() -> void:
 	var chart := Chart.new()
 	chart.audio_id = Chart.new_id()
@@ -351,16 +369,29 @@ func _check_storage(library: Library, arguments: PackedStringArray, wav: PackedB
 	chart.zones[0].rotation_offset = -60.0
 	chart.zones[0].center_rotation_speed = -90.0
 	chart.zones[0].extra_input_sides = (1 << 1) | (1 << 5)
+	chart.zones[0].center_x = 100.0
+	chart.zones[0].center_y = 0.0
+	chart.zones[0].center_size = 125.0
+	chart.zones[0].center_transition = 0.375
 	chart.events.append({"beat": 3.0, "lane": 2, "spike": false, "slider_direction": -1})
 	var with_zone := chart.record()
-	_check(Chart.from_record(with_zone).record() == with_zone, "Offscreen spawn distance and slider direction must round-trip with the chart.")
+	_check(Chart.from_record(with_zone).record() == with_zone, "Offscreen spawn distance, center layout, and slider direction must round-trip with the chart.")
 	var invalid_slider := with_zone.duplicate(true)
 	invalid_slider.events[1].slider_direction = 0
 	_check(Chart.from_record(invalid_slider) == null, "A slider must have a left or right direction.")
 	var old_zone := with_zone.duplicate(true)
 	old_zone.zones[0].erase("center_rotation_speed")
+	for key in ["center_x", "center_y", "center_size", "center_transition"]:
+		old_zone.zones[0].erase(key)
 	reopened = Chart.from_record(old_zone)
 	_check(reopened.zones[0].center_rotation_speed == 0.0, "A previously saved zone must default to a stationary center.")
+	_check(reopened.center_layout_track().is_empty() and reopened.zones[0].center_transition == 0.0, "Legacy zones must retain the original centered layout and size.")
+	var invalid_layout := with_zone.duplicate(true)
+	invalid_layout.zones[0].center_x = 100.1
+	_check(Chart.from_record(invalid_layout) == null, "A chart cannot place the center beyond the playfield edge.")
+	invalid_layout.zones[0].center_x = 100.0
+	invalid_layout.zones[0].center_transition = -0.1
+	_check(Chart.from_record(invalid_layout) == null, "Negative center transition times must be rejected.")
 	var with_duplicate := with_zone.duplicate(true)
 	with_duplicate.zones.append(Chart.new_zone(1.5))
 	_check(Chart.from_record(with_duplicate) == null, "Two zones cannot share the same start marker.")
@@ -436,6 +467,10 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	editor._zone_fields.rotation_offset.value = -120.0
 	editor._zone_fields.start_speed.value = 80.0
 	editor._zone_fields.center_rotation_speed.value = 120.0
+	editor._zone_fields.center_x.value = 100.0
+	editor._zone_fields.center_y.value = 0.0
+	editor._zone_fields.center_size.value = 150.0
+	editor._zone_fields.center_transition.value = 0.5
 	editor._zone_colors.background_color.color_changed.emit(Color("24364a"))
 	editor._input_circles.get_popup().id_pressed.emit(1)
 	_check(chart.zones[0].extra_input_sides == 2 and editor._input_circles.get_popup().is_item_checked(0), "Choosing an input side must update the zone and its menu.")
@@ -446,6 +481,7 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	click.pressed = true
 	editor.timeline._gui_input(click)
 	_check(editor._zone_settings.visible and editor._zone_fields.rotation_offset.value == -120.0 and editor._zone_fields.center_rotation_speed.value == 120.0, "Clicking a zone marker must reopen that zone's settings.")
+	_check(editor._zone_fields.center_x.value == 100.0 and editor._zone_fields.center_y.value == 0.0 and editor._zone_fields.center_size.value == 150.0 and editor._zone_fields.center_transition.value == 0.5, "Reopening zone settings must restore the edited corners, size, and duration.")
 	click.position.x = editor.timeline._x_at(2.5)
 	click.pressed = false
 	editor.timeline._gui_input(click)
@@ -453,6 +489,7 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	editor._play(false)
 	_check(app.song.session.events[0].motion.rotation == editor.preview.events[0].motion.rotation, "Playtest and editor preview must share the zone's motion profile.")
 	_check(app.song.arena.center_rotation_track == editor.preview.center_rotation_track and is_equal_approx(Chart.center_rotation_at(app.song.arena.center_rotation_track, 2.75), PI / 6.0), "Playtest and preview must share the arena angle at a given song time.")
+	_check(app.song.arena.center_layout_track == editor.preview.center_layout_track and Chart.center_layout_at(app.song.arena.center_layout_track, 2.75) == Vector3(75.0, 25.0, 125.0), "Playtest and preview must share the center transition at a given song time.")
 	_check(app.song.arena.background_track == editor.preview.background_track and Chart.background_at(app.song.arena.background_track, 2.75) == Color("24364a"), "Playtest and preview must share the edited zone background.")
 	_check(app.song.session.input_circle_track == editor.preview.input_circle_track and Chart.input_mask_at(app.song.session.input_circle_track, 2.75) == 3, "Playtest and preview must share the enabled input sides.")
 	app.song._leave()
@@ -510,6 +547,7 @@ func _run() -> void:
 	_check_extra_input_circles()
 	_check_same_beat_taps()
 	_check_center_rotation()
+	_check_center_layout()
 	_check_zone_colors()
 	var app := AppScene.instantiate()
 	root.add_child(app)

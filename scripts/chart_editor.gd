@@ -283,12 +283,23 @@ func _build_zone_settings() -> VBoxContainer:
 	header.add_child(UI.button("‹ Chart", _select_zone.bind(-1)))
 	_delete_zone_button = UI.button("Delete zone", _delete_zone)
 	header.add_child(_delete_zone_button)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	_zone_settings.add_child(scroll)
 	var fields := GridContainer.new()
 	fields.columns = 4
+	fields.size_flags_horizontal = SIZE_EXPAND_FILL
 	fields.add_theme_constant_override("h_separation", 8)
 	fields.add_theme_constant_override("v_separation", 6)
-	_zone_settings.add_child(fields)
-	_add_zone_field(fields, "Spawn distance", "spawn_radius", Chart.MIN_SPAWN_RADIUS, Chart.MAX_SPAWN_RADIUS, 1.0, "", "Initial polygon radius from the center. Larger values can start outside the arena.")
+	scroll.add_child(fields)
+	_add_zone_field(fields, "Center X", "center_x", 0.0, 100.0, 0.1, "%", "Horizontal position in the playfield, from the left edge (0%) to the right edge (100%).")
+	_add_zone_field(fields, "Center Y", "center_y", 0.0, 100.0, 0.1, "%", "Vertical position in the playfield, from the top edge (0%) to the bottom edge (100%).")
+	_add_zone_field(fields, "Center size", "center_size", Chart.MIN_CENTER_SIZE, Chart.MAX_CENTER_SIZE, 1.0, "%", "Size of the center polygon and its input circles. 100% is the default size.")
+	_add_zone_field(fields, "Center transition", "center_transition", 0.0, 60.0, 0.001, "s", "Seconds to reach the new position and size after the zone starts. Use 0 for an instant change.")
+	_zone_fields.center_transition.allow_greater = true
+	_add_zone_field(fields, "Spawn distance", "spawn_radius", Chart.MIN_SPAWN_RADIUS, Chart.MAX_SPAWN_RADIUS, 1.0, "", "Initial polygon radius at the default center size. Larger values can start outside the arena.")
 	_add_zone_field(fields, "Start speed", "start_speed", Chart.MIN_APPROACH_SPEED, Chart.MAX_APPROACH_SPEED, 1.0, "", "Approach speed at the beginning, in units per second.")
 	_add_zone_field(fields, "Rotation offset", "rotation_offset", -360.0, 360.0, 0.1, "°", "Initial rotation relative to the charted direction.")
 	_add_zone_field(fields, "End speed", "end_speed", Chart.MIN_APPROACH_SPEED, Chart.MAX_APPROACH_SPEED, 1.0, "", "Approach speed at the end, in units per second.")

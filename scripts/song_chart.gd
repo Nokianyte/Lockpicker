@@ -17,6 +17,9 @@ const MIN_APPROACH_SPEED := 30.0
 const MAX_APPROACH_SPEED := 2000.0
 const DEFAULT_APPROACH_SPEED := 176.0
 const MAX_CENTER_ROTATION_SPEED := 3600.0
+const DEFAULT_CENTER_LAYOUT := Vector3(50.0, 50.0, 100.0)
+const MIN_CENTER_SIZE := 25.0
+const MAX_CENTER_SIZE := 300.0
 const ZONE_COLOR_DEFAULTS := {
 	"polygon_start_color": Palette.INK,
 	"polygon_end_color": Palette.INK,
@@ -67,6 +70,8 @@ static func new_zone(beat: float) -> Dictionary:
 		"beat": beat, "spawn_radius": T.OUTER_RADIUS,
 		"start_speed": DEFAULT_APPROACH_SPEED, "end_speed": DEFAULT_APPROACH_SPEED,
 		"rotation_offset": 0.0, "center_rotation_speed": 0.0,
+		"center_x": DEFAULT_CENTER_LAYOUT.x, "center_y": DEFAULT_CENTER_LAYOUT.y,
+		"center_size": DEFAULT_CENTER_LAYOUT.z, "center_transition": 0.0,
 	}
 
 func zone_at(beat: float) -> int:
@@ -109,6 +114,32 @@ static func center_rotation_at(track: Array[Dictionary], at: float) -> float:
 		return 0.0
 	var segment := track[index]
 	return fposmod(float(segment.angle) + (at - float(segment.time)) * float(segment.speed), TAU)
+
+func center_layout_track() -> Array[Dictionary]:
+	var track: Array[Dictionary] = []
+	var target := DEFAULT_CENTER_LAYOUT
+	for zone in zones:
+		var next := Vector3(zone.center_x, zone.center_y, zone.center_size)
+		if next == target:
+			continue
+		var time := time_at(zone.beat)
+		# A new target starts from the current layout, even during an earlier transition.
+		var from := DEFAULT_CENTER_LAYOUT if track.is_empty() else _interpolate_center_layout(track.back(), time)
+		track.append({"time": time, "from": from, "target": next, "duration": zone.center_transition})
+		target = next
+	return track
+
+static func center_layout_at(track: Array[Dictionary], at: float) -> Vector3:
+	var index := _segment_at(track, at)
+	return DEFAULT_CENTER_LAYOUT if index < 0 else _interpolate_center_layout(track[index], at)
+
+static func _interpolate_center_layout(segment: Dictionary, at: float) -> Vector3:
+	var target: Vector3 = segment.target
+	var duration: float = segment.duration
+	if duration == 0.0:
+		return target
+	var from: Vector3 = segment.from
+	return from.lerp(target, clampf((at - float(segment.time)) / duration, 0.0, 1.0))
 
 func background_track() -> Array[Dictionary]:
 	var track: Array[Dictionary] = []
@@ -283,6 +314,14 @@ static func from_record(record: Variant) -> RefCounted:
 		var center_speed: Variant = zone.get("center_rotation_speed", 0.0)
 		if not number_between(center_speed, -MAX_CENTER_ROTATION_SPEED, MAX_CENTER_ROTATION_SPEED):
 			return null
+		var center_x: Variant = zone.get("center_x", DEFAULT_CENTER_LAYOUT.x)
+		var center_y: Variant = zone.get("center_y", DEFAULT_CENTER_LAYOUT.y)
+		if not number_between(center_x, 0.0, 100.0) or not number_between(center_y, 0.0, 100.0):
+			return null
+		var center_size: Variant = zone.get("center_size", DEFAULT_CENTER_LAYOUT.z)
+		var center_transition: Variant = zone.get("center_transition", 0.0)
+		if not number_between(center_size, MIN_CENTER_SIZE, MAX_CENTER_SIZE) or not number_between(center_transition, 0.0, INF):
+			return null
 		var extra_inputs: Variant = zone.get("extra_input_sides", 0)
 		if not number_between(extra_inputs, 0, ALL_EXTRA_INPUTS) or int(extra_inputs) != extra_inputs or (int(extra_inputs) & PRIMARY_INPUT) != 0:
 			return null
@@ -290,6 +329,8 @@ static func from_record(record: Variant) -> RefCounted:
 			"beat": float(zone.beat), "spawn_radius": float(zone.spawn_radius),
 			"start_speed": float(zone.start_speed), "end_speed": float(zone.end_speed),
 			"rotation_offset": float(zone.rotation_offset), "center_rotation_speed": float(center_speed),
+			"center_x": float(center_x), "center_y": float(center_y),
+			"center_size": float(center_size), "center_transition": float(center_transition),
 		}
 		if extra_inputs != 0:
 			settings.extra_input_sides = int(extra_inputs)

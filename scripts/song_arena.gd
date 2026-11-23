@@ -133,11 +133,14 @@ func _draw() -> void:
 	# Draw opaque silhouettes over every ring, with their distance fade blended into the background.
 	for spike in spikes:
 		Art.spiky_circle(self, spike.point, marker_radius, spike.angle, spike.ink)
-	if session != null and session.tint_judgment != Session.Judgment.MISS and age < T.BREAK_TIME and (input_mask & (1 << session.tint_side)) != 0:
-		var target := G.song_marker(T.SONG_CORE_RADIUS, G.input_angle(target_angle, session.tint_side)) * zoom
+	if session != null and age < T.BREAK_TIME:
+		var pulsing_sides := input_mask & session.tint_sides
 		var progress := age / T.BREAK_TIME
 		var pulse_radius := marker_radius * lerpf(0.8, 2.2, progress)
-		draw_arc(target, pulse_radius, 0.0, TAU, 40, Color(tint, 1.0 - progress), 1.6, true)
+		for side in Chart.DIRECTIONS.size():
+			if (pulsing_sides & (1 << side)) != 0:
+				var target := G.song_marker(T.SONG_CORE_RADIUS, G.input_angle(target_angle, side)) * zoom
+				draw_arc(target, pulse_radius, 0.0, TAU, 40, Color(tint, 1.0 - progress), 1.6, true)
 	if session != null:
 		_draw_combo(T.SONG_CORE_RADIUS * zoom, foreground, foreground.lerp(background, 0.35) if dark else Palette.MUTED)
 

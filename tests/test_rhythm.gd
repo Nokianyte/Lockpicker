@@ -183,9 +183,9 @@ func _check_extra_input_circles() -> void:
 	slider.slider_direction = 1
 	model.setup([_event(1.0, 2), _event(1.0, 1), slider, _event(1.8, 2, true), _event(2.1, 2)], 3.0, 0.0, 0.0, track)
 	model.press(1.0)
-	_check(model.hits == 1 and model.resolved[1] == 1 and model.tint_side == 1, "An extra target must allow a hit even when a simultaneous note is misaligned.")
+	_check(model.hits == 1 and model.resolved[1] == 1 and model.tint_sides == 2, "An extra target must allow a hit even when a simultaneous note is misaligned.")
 	model.press_arrow(1, 1.5)
-	_check(model.hits == 2 and model.tint_side == 1, "A slider must score at an enabled extra target.")
+	_check(model.hits == 2 and model.tint_sides == 2, "A slider must score at an enabled extra target.")
 	model.advance_to(1.8)
 	_check(model.spike_hits == 1, "The extra target must rotate with the slider and register a spike hit.")
 	model.press(2.1)
@@ -193,6 +193,20 @@ func _check_extra_input_circles() -> void:
 	_check(Chart.from_record(chart.record()).zones == chart.zones, "Extra input sides must survive saving and reopening.")
 	chart.zones[0].extra_input_sides = 63
 	_check(Chart.from_record(chart.record()) == null, "The mandatory primary side cannot be stored as an extra side.")
+
+func _check_same_beat_taps() -> void:
+	var model := Session.new()
+	var slider := _event(1.0, 3)
+	slider.slider_direction = 1
+	var track: Array[Dictionary] = [{"time": 0.0, "mask": 1 | (1 << 3) | (1 << 4)}]
+	model.setup([_event(0.5), _event(1.0, 0), _event(1.0, 2), slider, _event(1.0, 4, true), _event(1.0, 5), _event(1.06)], 3.0, 0.0, 0.0, track)
+	model.rotate(1.0, 0.78)
+	model.press(0.99)
+	_check(model.hits == 2 and model.combo == 2 and model.energy == 95, "One tap must apply both hits when two circles align after a turn.")
+	_check(model.tint_sides == (1 | (1 << 3)), "Both aligned circles must pulse for the shared judgment.")
+	_check(model.resolved == PackedByteArray([1, 0, 1, 0, 0, 1, 0]), "One tap must leave the misaligned note, slider, spike, and adjacent beat pending.")
+	model.press_arrow(1, 1.0)
+	_check(model.hits == 3 and model.spike_hits == 0 and model.resolved[3] == 1, "The spike and slider must still use their own judgment rules.")
 
 func _check_center_rotation() -> void:
 	var chart := Chart.new()
@@ -494,6 +508,7 @@ func _run() -> void:
 	_check_sliders()
 	_check_zone_motion()
 	_check_extra_input_circles()
+	_check_same_beat_taps()
 	_check_center_rotation()
 	_check_zone_colors()
 	var app := AppScene.instantiate()

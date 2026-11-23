@@ -32,7 +32,7 @@ var feedback := ""
 var feedback_at := -INF
 var tint_judgment := Judgment.NONE
 var tint_at := -INF
-var tint_side := 0
+var tint_sides := 0
 
 var _deadline_order: Array[int] = []
 var _deadline_cursor := 0
@@ -152,7 +152,24 @@ func press(at: float) -> void:
 	if index < 0:
 		_feedback("Off beat", time)
 		return
-	_hit_note(index)
+	var beat_time: float = events[index].time
+	var hit_count := 0
+	var hit_sides := 0
+	for candidate in range(first_event_at(events, beat_time), events.size()):
+		var event := events[candidate]
+		if event.time != beat_time:
+			break
+		if resolved[candidate] or event.spike or event.has("slider_direction"):
+			continue
+		var side := _note_input_side(candidate)
+		if side >= 0:
+			_resolve(candidate)
+			hit_count += 1
+			hit_sides |= 1 << side
+	if hit_count == 0:
+		_feedback("Wrong direction", time)
+	else:
+		_score_hits(beat_time, hit_count, hit_sides)
 
 func press_arrow(direction: int, at: float) -> void:
 	advance_to(at)
@@ -164,7 +181,12 @@ func press_arrow(direction: int, at: float) -> void:
 	elif int(events[index].slider_direction) != direction:
 		_feedback("Wrong arrow", time)
 	else:
-		_hit_note(index)
+		var side := _note_input_side(index)
+		if side < 0:
+			_feedback("Wrong direction", time)
+		else:
+			_resolve(index)
+			_score_hits(events[index].time, 1, 1 << side)
 
 func _nearest_note(slider: bool, direction: int = 0) -> int:
 	var best := -1
@@ -188,23 +210,17 @@ func _nearest_note(slider: bool, direction: int = 0) -> int:
 func _note_input_side(index: int) -> int:
 	return note_input_side(slider_turns, input_circle_track, events[index], ring_angle(index, time), time)
 
-func _hit_note(index: int) -> void:
-	var note := events[index]
-	var side := _note_input_side(index)
-	if side < 0:
-		_feedback("Wrong direction", time)
-		return
-	_resolve(index)
-	hits += 1
-	combo += 1
-	energy = mini(MAX_ENERGY, energy + ENERGY_PER_HIT)
-	var timing := time - float(note.time)
+func _score_hits(beat_time: float, hit_count: int, hit_sides: int) -> void:
+	hits += hit_count
+	combo += hit_count
+	energy = mini(MAX_ENERGY, energy + ENERGY_PER_HIT * hit_count)
+	var timing := time - beat_time
 	var error := absf(timing)
 	var timing_label := " · Early" if timing < 0.0 else " · Late"
 	if error <= PERFECT_WINDOW + CLOCK_EPSILON:
-		_judge(Judgment.PERFECT, "Perfect", time, side)
+		_judge(Judgment.PERFECT, "Perfect", time, hit_sides)
 	elif error <= GOOD_WINDOW + CLOCK_EPSILON:
-		_judge(Judgment.GOOD, "Good" + timing_label, time, side)
+		_judge(Judgment.GOOD, "Good" + timing_label, time, hit_sides)
 	else:
 		_judge(Judgment.OK, "OK" + timing_label, time)
 
@@ -240,11 +256,11 @@ func _feedback(message: String, at: float) -> void:
 	feedback = message
 	feedback_at = at
 
-func _judge(result: Judgment, message: String, at: float, side: int = 0) -> void:
+func _judge(result: Judgment, message: String, at: float, sides: int = 0) -> void:
 	if result != Judgment.OK:
 		tint_judgment = result
 		tint_at = at
-		tint_side = side
+		tint_sides = sides
 	_feedback(message, at)
 
 func _penalize(message: String, at: float) -> void:

@@ -23,7 +23,8 @@ window.lockpickerSongAudio ??= (function () {
 		let clock;
 		if (context.getOutputTimestamp) {
 			const output = context.getOutputTimestamp();
-			if (!output.performanceTime) return offset;
+			// A stale timestamp from before playback can otherwise advance the chart too early.
+			if (!output.performanceTime || output.contextTime < started) return offset;
 			const elapsed = (performance.now() - output.performanceTime) / 1000;
 			clock = Math.min(context.currentTime, output.contextTime + elapsed);
 		} else {
@@ -76,8 +77,8 @@ window.lockpickerSongAudio ??= (function () {
 				started = context.currentTime + 0.04;
 				source.start(started, position, end - position);
 			};
-			if (context.state === 'running') start();
-			else ready.then(start);
+			// Give the browser a turn to refresh currentTime after a blocking PCM upload.
+			ready.then(() => setTimeout(start, 0));
 		},
 		stop() {
 			request = null;

@@ -4,11 +4,13 @@ signal web_finished(result: Array)
 
 const Chart = preload("res://scripts/song_chart.gd")
 const Package = preload("res://scripts/chart_package.gd")
+const BUNDLED_CHARTS := ["res://charts/Ghostgate.lockchart"]
 const MAX_AUDIO_BYTES := Package.MAX_AUDIO_BYTES
 const AUDIO_SIZE_ERROR := "Choose an MP3 or WAV file under 128 MiB."
 const PACKAGE_SIZE_ERROR := "This chart package is too large."
 const MP3_DECODE_RATE := 44100
 const MP3_FRAMES_PER_PASS := 32768
+const MP3_FRAME_BUDGET_USEC := 8000
 const PCM_STEREO_FRAME_BYTES := 4
 const WEB_STORAGE := """
 window.lockpickerChartStorage = (function () {
@@ -43,7 +45,7 @@ window.lockpickerChartStorage = (function () {
 			run(callback, db => transact(db, ['charts', 'audio'], 'readonly', (tx, result) => {
 				const chart = tx.objectStore('charts').get(id);
 				chart.onsuccess = () => {
-					if (!chart.result) return tx.abort();
+					if (!chart.result) return;
 					const audio = tx.objectStore('audio').get(JSON.parse(chart.result).audio_id);
 					audio.onsuccess = () => {
 						if (audio.result) result([chart.result, audio.result]);
@@ -99,10 +101,17 @@ window.lockpickerChartStorage = (function () {
 """
 
 var directory := "user://charts"
+var _bundled: Dictionary[String, Dictionary] = {}
 var _web: JavaScriptObject
 var _callback: JavaScriptObject
 
 func _ready() -> void:
+	for path in BUNDLED_CHARTS:
+		var data := Package.unpack(FileAccess.get_file_as_bytes(path))
+		if data.is_empty():
+			push_error("Could not read bundled chart: " + path)
+			continue
+		_bundled[data.chart.id] = data
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval(WEB_STORAGE, true)
 		_web = JavaScriptBridge.get_interface("lockpickerChartStorage")
@@ -126,13 +135,19 @@ func list_charts() -> Dictionary:
 		for file in DirAccess.get_files_at(directory):
 			if file.get_extension() == "json":
 				records.append(FileAccess.get_file_as_string(directory.path_join(file)))
-	var charts: Array[Dictionary] = []
+	var by_id: Dictionary[String, Dictionary] = {}
+	for data in _bundled.values():
+		by_id[data.chart.id] = _chart_summary(data.chart)
 	for record in records:
 		var chart = Chart.from_record(JSON.parse_string(record))
 		if chart != null:
-			charts.append({"id": chart.id, "title": chart.title, "audio_name": chart.audio_name})
+			by_id[chart.id] = _chart_summary(chart)
+	var charts := by_id.values()
 	charts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.title.naturalnocasecmp_to(b.title) < 0)
 	return {"charts": charts}
+
+static func _chart_summary(chart: Chart) -> Dictionary:
+	return {"id": chart.id, "title": chart.title, "audio_name": chart.audio_name}
 
 func read_chart(id: String) -> Dictionary:
 	var data := await _read_chart_data(id)
@@ -153,12 +168,15 @@ func _read_chart_data(id: String) -> Dictionary:
 		var response: Array = await web_finished
 		if response[0] != "":
 			return {"error": response[0]}
+		if response.size() == 1:
+			return _read_bundled_chart(id)
 		record = JSON.parse_string(response[1])
 		bytes = response[2]
 	else:
 		var path := directory.path_join(id + ".json")
-		if FileAccess.file_exists(path):
-			record = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if not FileAccess.file_exists(path):
+			return _read_bundled_chart(id)
+		record = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var chart = Chart.from_record(record)
 	if chart == null or chart.id != id:
 		return {"error": "Could not read this chart."}
@@ -167,6 +185,12 @@ func _read_chart_data(id: String) -> Dictionary:
 	if bytes.is_empty():
 		return {"error": "The saved song could not be opened."}
 	return {"chart": chart, "audio": bytes}
+
+func _read_bundled_chart(id: String) -> Dictionary:
+	if not _bundled.has(id):
+		return {"error": "Could not read this chart."}
+	var data := _bundled[id]
+	return {"chart": Chart.from_record(data.chart.record()), "audio": data.audio}
 
 func import_package(bytes: PackedByteArray) -> String:
 	var data := Package.unpack(bytes)
@@ -197,6 +221,10 @@ func save_chart(chart, new_audio: PackedByteArray) -> String:
 	var record: Dictionary = chart.record()
 	if Chart.from_record(record) == null:
 		return "Enter a chart name and import a song before saving."
+	# Save a local copy with its own audio so a later update to the bundle cannot change it.
+	var bundled: Dictionary = _bundled.get(chart.id, {})
+	if new_audio.is_empty() and not bundled.is_empty() and chart.audio_id == bundled.chart.audio_id:
+		new_audio = bundled.audio
 	var json := JSON.stringify(record)
 	if _web != null:
 		var encoded := Marshalls.raw_to_base64(new_audio) if not new_audio.is_empty() else ""
@@ -276,6 +304,7 @@ func _decode_mp3(bytes: PackedByteArray) -> AudioStreamWAV:
 	decoder.start()
 	var rate_scale := float(AudioServer.get_mix_rate()) / MP3_DECODE_RATE
 	var frames_written := 0
+	var frame_started := Time.get_ticks_usec()
 	while frames_written < expected_frames:
 		var count := mini(MP3_FRAMES_PER_PASS, expected_frames - frames_written)
 		var samples := decoder.mix_audio(rate_scale, count)
@@ -286,8 +315,10 @@ func _decode_mp3(bytes: PackedByteArray) -> AudioStreamWAV:
 			frames_written += 1
 		if samples.size() < count:
 			break
-		if frames_written < expected_frames:
+		# Decode as many blocks as the frame budget allows before yielding.
+		if frames_written < expected_frames and Time.get_ticks_usec() - frame_started >= MP3_FRAME_BUDGET_USEC:
 			await get_tree().process_frame
+			frame_started = Time.get_ticks_usec()
 	decoder.stop()
 	if frames_written == 0:
 		return null

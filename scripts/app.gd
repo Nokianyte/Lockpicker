@@ -5,13 +5,14 @@ const Library = preload("res://scripts/chart_library.gd")
 const SongPlayer = preload("res://scripts/song_player.gd")
 const UI = preload("res://scripts/chart_ui.gd")
 const SETTINGS_FILE := "user://settings.cfg"
+const DEFAULT_VOLUME := 50
 
 var editor: ChartEditor
 var song: SongPlayer
 var _settings: AcceptDialog
 var _volume_slider: HSlider
 var _volume_label: Label
-var _saved_volume := 100
+var _saved_volume := DEFAULT_VOLUME
 var _from_editor := false
 var _browser: JavaScriptObject
 
@@ -43,8 +44,8 @@ func _ready() -> void:
 		JavaScriptBridge.eval("""
 			window.lockpickerSettings = {
 				readVolume() {
-					try { return localStorage.getItem('lockpicker.masterVolume') ?? '100'; }
-					catch (_) { return '100'; }
+					try { return localStorage.getItem('lockpicker.masterVolume') ?? ''; }
+					catch (_) { return ''; }
 				},
 				writeVolume(value) {
 					try { localStorage.setItem('lockpicker.masterVolume', String(value)); }
@@ -109,11 +110,11 @@ func _apply_volume(percent: float) -> void:
 func _load_volume() -> int:
 	if _browser != null:
 		var stored: String = _browser.lockpickerSettings.readVolume()
-		return clampi(stored.to_int(), 0, 100) if stored.is_valid_int() else 100
+		return clampi(stored.to_int(), 0, 100) if stored.is_valid_int() else DEFAULT_VOLUME
 	var config := ConfigFile.new()
 	config.load(SETTINGS_FILE)
-	var stored: Variant = config.get_value("audio", "master_volume", 100)
-	return clampi(stored, 0, 100) if stored is int else 100
+	var stored: Variant = config.get_value("audio", "master_volume", DEFAULT_VOLUME)
+	return clampi(stored, 0, 100) if stored is int else DEFAULT_VOLUME
 
 func _save_volume() -> void:
 	var value := int(_volume_slider.value)

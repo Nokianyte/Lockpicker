@@ -402,7 +402,14 @@ func _check_storage(library: Library, arguments: PackedStringArray, wav: PackedB
 	if arguments.size() != 2:
 		return
 	library.directory = arguments[1]
+	var bundled := Package.unpack(FileAccess.get_file_as_bytes("res://charts/Ghostgate.lockchart"))
+	var ghostgate: Chart = bundled.chart
 	if arguments[0] == "write":
+		var initial: Dictionary = await library.list_charts()
+		_check(initial.charts.any(func(entry: Dictionary) -> bool: return entry.id == ghostgate.id and entry.title == "Ghostgate"), "A fresh chart library must list the bundled chart.")
+		var original := await library.export_package(ghostgate.id)
+		var original_data := Package.unpack(original.get("bytes", PackedByteArray()))
+		_check(original_data.get("audio") == bundled.audio, "The bundled chart must export with its original audio before any local save.")
 		_check(await library.save_chart(chart, wav) == "", "Native save must write the chart and audio.")
 		chart.title = "Updated timing check"
 		_check(await library.save_chart(chart, PackedByteArray()) == "", "Saving an existing chart must replace its metadata.")
@@ -413,15 +420,20 @@ func _check_storage(library: Library, arguments: PackedStringArray, wav: PackedB
 		_check(readback.has("bytes") and await library.import_package(readback.bytes) == "", "A chart package must import into the library as a copy.")
 		chart.audio_id = Chart.new_id()
 		_check(await library.save_chart(chart, PackedByteArray()) != "", "Missing replacement audio must reject the save.")
+		ghostgate.title = "Ghostgate test edit"
+		_check(await library.save_chart(ghostgate, PackedByteArray()) == "", "Editing the bundled chart must save a local copy with its audio.")
 	elif arguments[0] == "read":
 		var library_index: Dictionary = await library.list_charts()
-		_check(library_index.charts.size() == 2, "The original chart and imported copy must appear after a fresh process starts.")
+		var player_charts: Array = library_index.charts.filter(func(entry: Dictionary) -> bool: return entry.id != ghostgate.id)
+		_check(player_charts.size() == 2, "The original chart and imported copy must appear after a fresh process starts.")
+		var bundled_entries: Array = library_index.charts.filter(func(entry: Dictionary) -> bool: return entry.id == ghostgate.id)
+		_check(bundled_entries.size() == 1 and bundled_entries[0].title == "Ghostgate test edit", "A local edit of the bundled chart must persist and appear once.")
 		var saved: Dictionary = await library.read_chart(chart.id)
 		_check(saved.has("chart") and saved.chart.title == "Updated timing check", "The last successful native save must survive a restart.")
 		_check(saved.has("stream") and is_equal_approx(saved.stream.get_length(), 6.0), "The saved song must reopen without another import.")
 		_check(saved.has("chart") and saved.chart.zones == chart.zones, "Saved zone settings must survive a fresh process.")
 		_check(saved.has("chart") and saved.chart.events == chart.events, "Saved sliders must survive a fresh process.")
-		for entry in library_index.charts:
+		for entry in player_charts:
 			if entry.id != chart.id:
 				var imported := await library.read_chart(entry.id)
 				_check(imported.has("chart") and imported.chart.audio_id != chart.audio_id and imported.chart.events == chart.events and imported.stream.data == saved.stream.data, "Import must create separate IDs and preserve the playable song.")

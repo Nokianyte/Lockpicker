@@ -440,8 +440,10 @@ func _open_saved(id: String, play: bool) -> void:
 	if play:
 		transport.unlock_audio()
 	_busy = true
+	_library_status.text = "Loading chart…"
 	var result: Dictionary = await library.read_chart(id)
 	_busy = false
+	_library_status.text = ""
 	if result.has("error"):
 		_library_status.text = result.error
 	elif play:

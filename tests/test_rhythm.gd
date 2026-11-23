@@ -242,7 +242,7 @@ func _wav() -> PackedByteArray:
 	return wav
 
 func _check_application(app, wav: PackedByteArray) -> void:
-	app._show_charts()
+	_check(app.editor.visible and app.editor._library_screen.is_visible_in_tree() and not app.song.visible, "The app must open straight to the chart library.")
 	app.editor._open_editor(Chart.new(), null)
 	app.editor._accept_song({"name": "Timing.wav", "bytes": wav})
 	var chart: Chart = app.editor.chart

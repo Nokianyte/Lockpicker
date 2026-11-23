@@ -1,5 +1,7 @@
 # Verification
 
+The current build starts in the chart library. The Godot suite is `tests/test_rhythm.gd`, and the browser smoke test creates and plays a chart with a generated WAV file. The entries below record earlier builds.
+
 ## Center polygon and layer boost
 
 - Godot 4.7.2 starts and exports the updated game successfully. All 620 deterministic checks pass, including fixed ring angles, boost isolation and release, contact during a turn, pause and restart, and 100 consecutive clears at both normal and boosted speed.
@@ -28,7 +30,7 @@ Earlier verification entries below describe the previous dash and bounce mechani
 
 ## Local browser checks
 
-Automated browser mouse-wheel and middle-button events were exercised in installed Microsoft Edge, portable official Chrome for Testing 158.0.8127.36, and Playwright Firefox 159. All three loaded the game with no JavaScript errors and no page scrolling. Screenshots confirm successful escape and score increase, game over, restart, resized layout, focus pause, and resume. The test runner is `tools/browser-check.cjs`; screenshots are local ignored outputs under `test-results/`.
+Automated browser mouse-wheel and middle-button events were exercised in installed Microsoft Edge, portable official Chrome for Testing 158.0.8127.36, and Playwright Firefox 159. All three loaded the game with no JavaScript errors and no page scrolling. The screenshots recorded successful escape and score increase, game over, restart, resized layout, focus pause, and resume.
 
 Browser checks found and fixed missing explicit web focus handling and a missing favicon request. Header/footer backgrounds keep moving walls away from text.
 

@@ -1,6 +1,5 @@
 extends Control
 
-signal game_requested
 signal settings_requested
 signal play_requested(chart, stream: AudioStreamWAV, cursor: float, from_editor: bool)
 
@@ -29,7 +28,6 @@ var _library_screen: VBoxContainer
 var _editor_screen: VBoxContainer
 var _library_rows: VBoxContainer
 var _library_status: Label
-var _back_to_game: Button
 var _status: Label
 var _title: LineEdit
 var _song_name: Label
@@ -106,26 +104,19 @@ func _build_library() -> VBoxContainer:
 	var screen := VBoxContainer.new()
 	var header := HBoxContainer.new()
 	screen.add_child(header)
-	_back_to_game = UI.button("‹ Rhythm", func() -> void:
-		if not _busy:
-			game_requested.emit()
-	)
-	header.add_child(_back_to_game)
+	var heading := UI.label("Charts", 36)
+	heading.size_flags_horizontal = SIZE_EXPAND_FILL
+	header.add_child(heading)
 	header.add_child(UI.button("Settings", settings_requested.emit))
+	header.add_child(UI.button("New chart", func() -> void:
+		if not _busy:
+			_open_editor(Chart.new(), null)
+	, true))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	var book := VBoxContainer.new()
 	book.size_flags_horizontal = SIZE_EXPAND_FILL
-	var title := HBoxContainer.new()
-	book.add_child(title)
-	var heading := UI.label("Charts", 36)
-	heading.size_flags_horizontal = SIZE_EXPAND_FILL
-	title.add_child(heading)
-	title.add_child(UI.button("New chart", func() -> void:
-		if not _busy:
-			_open_editor(Chart.new(), null)
-	, true))
 	_library_status = UI.label("", 15, UI.MUTED)
 	book.add_child(_library_status)
 	_library_rows = VBoxContainer.new()
@@ -133,9 +124,6 @@ func _build_library() -> VBoxContainer:
 	scroll.add_child(book)
 	screen.add_child(scroll)
 	return screen
-
-func set_game_label(label: String) -> void:
-	_back_to_game.text = "‹ " + label
 
 func _build_editor() -> VBoxContainer:
 	var screen := VBoxContainer.new()

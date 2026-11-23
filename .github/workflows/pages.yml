@@ -42,7 +42,7 @@ jobs:
       - name: Import and test
         run: |
           godot --headless --path . --editor --import --quit
-          godot --headless --path . --script tests/test_game.gd
+          godot --headless --path . --script tests/test_rhythm.gd
       - name: Export
         run: |
           release_dir="build/web/releases/${GITHUB_SHA}"

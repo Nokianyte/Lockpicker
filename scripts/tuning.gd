@@ -1,19 +1,11 @@
 extends RefCounted
 
-const WALL_WIDTH := 3.0
-const INITIAL_RADIUS := 174.0
-const WALL_SPACING := 72.0
-const WALL_COUNT := 4
-const OUTER_RADIUS := INITIAL_RADIUS + (WALL_COUNT - 1) * WALL_SPACING
+const OUTER_RADIUS := 390.0
 const SONG_CORE_RADIUS := 100.0
 const SONG_SPIKE_ALIGNMENT_RADIUS := 11.0
 const GAP_ANGLE := 0.34
 const TIP_ANGLE := -PI / 2.0
-const TIP_LENGTH := 96.0
 const TIP_EDGE_MARGIN := 0.03
 const WHEEL_STEP := PI / 3.0
 const TURN_DURATION := 0.16
-const OPENING_TIME := 13.2
-const MIN_LAYER_TIME := 0.75
-const DROP_SPEED := 2400.0
 const BREAK_TIME := 0.42

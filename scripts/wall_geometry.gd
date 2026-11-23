@@ -27,10 +27,6 @@ static func segments(radius: float, rotation: float) -> Array:
 		result.append([point(radius, rotation, angles[i]), point(radius, rotation, angles[i + 1])])
 	return result
 
-static func tip_contact_radius(tip_angle: float, gap_angle: float) -> float:
-	# Include the inner edge of the stroke when the tip reaches the ring.
-	return T.TIP_LENGTH / point(1.0, gap_angle, tip_angle).length() + T.WALL_WIDTH / (2.0 * cos(PI / 6.0))
-
 static func gap_accepts_tip(tip_angle: float, gap_angle: float) -> bool:
 	return absf(angle_difference(tip_angle, gap_angle)) < T.GAP_ANGLE / 2.0 - T.TIP_EDGE_MARGIN
 

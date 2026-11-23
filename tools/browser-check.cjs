@@ -4,6 +4,29 @@ const { chromium, firefox } = require('../.tools/node_modules/playwright');
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 
+function testSong() {
+  const rate = 8000;
+  const frames = 6 * rate;
+  const wav = Buffer.alloc(44 + 2 * frames);
+  wav.write('RIFF', 0);
+  wav.writeUInt32LE(wav.length - 8, 4);
+  wav.write('WAVEfmt ', 8);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(rate, 24);
+  wav.writeUInt32LE(2 * rate, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(2 * frames, 40);
+  for (let frame = 0; frame < frames; frame++) {
+    const beatAge = (frame / rate) % 0.5;
+    wav.writeInt16LE(Math.round(Math.sin(frame * Math.PI * 880 / rate) * Math.exp(-35 * beatAge) * 7000), 44 + frame * 2);
+  }
+  return { name: 'Timing.wav', mimeType: 'audio/wav', buffer: wav };
+}
+
 (async () => {
   const target = process.argv[2] || 'http://127.0.0.1:8060';
   const engine = process.argv[3] || 'edge';
@@ -19,6 +42,15 @@ const assert = require('node:assert/strict');
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+    if (engine === 'firefox') {
+      await page.addInitScript(() => {
+        const click = HTMLInputElement.prototype.click;
+        HTMLInputElement.prototype.click = function () {
+          if (this.type !== 'file') return click.call(this);
+        };
+      });
+    }
+    page.on('filechooser', () => {});
     async function waitForGame() {
       await page.locator('#canvas, #game').first().waitFor({ state: 'attached', timeout: 90000 });
       const screen = await page.locator('#game').count() ? page.frameLocator('#game') : page;
@@ -32,75 +64,122 @@ const assert = require('node:assert/strict');
         }),
       ]);
       await canvas.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-      return canvas;
+      return { canvas, screen };
     }
     // A cold hosted load has to fetch the full Godot WebAssembly runtime.
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 90000 });
-    const canvas = await waitForGame();
+    const { canvas, screen } = await waitForGame();
     if (await page.locator('#game').count()) {
       assert.match(await page.locator('#game').getAttribute('src'), /^\.\/releases\/[a-f0-9]{40}\/index\.html$/);
     }
     fs.mkdirSync('test-results', { recursive: true });
     const save = label => page.screenshot({ path: `test-results/${engine}-${label}.png` });
-    const score = () => page.screenshot({ clip: { x: 920, y: 18, width: 120, height: 25 } });
-    const center = () => page.screenshot({ clip: { x: 365, y: 265, width: 370, height: 270 } });
-    await canvas.click();
-    const zero = await score();
+    const click = async (x, y) => {
+      await page.mouse.click(x, y);
+      await page.waitForTimeout(120);
+    };
+    const hits = () => page.screenshot({ clip: { x: 1005, y: 22, width: 75, height: 38 } });
+    await save('charts');
+    await click(938, 45);
+    await save('settings');
+    await click(550, 435);
+    await click(1031, 45);
+    await click(451, 42);
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type('Browser chart', { delay: 30 });
+    await page.keyboard.press('Enter');
+    await click(1004, 150);
+    await screen.locator('input[type=file]').setInputFiles(testSong(), { timeout: 8000 });
+    await page.waitForTimeout(500);
+    await click(235, 480);
+    await click(358, 518);
+    await click(965, 42);
+    await page.waitForTimeout(300);
+    await save('chart-editor');
 
-    const started = Date.now();
-    const waitUntil = elapsed => page.waitForTimeout(Math.max(0, elapsed - (Date.now() - started)));
-    await page.keyboard.press('z');
-    await page.keyboard.down('ArrowRight');
-    await page.keyboard.down('ArrowRight');
-    await page.keyboard.up('ArrowRight');
-    await waitUntil(1200);
-    await page.keyboard.down('z');
-    await waitUntil(1340);
-    const afterZ = await score();
-    assert.notDeepEqual(afterZ, zero, 'one Right Arrow turn should align the ring even after a repeated keydown');
-    await save('rhythm-hit');
-
-    await page.keyboard.press('ArrowLeft');
-    await waitUntil(2400);
-    await page.keyboard.down('x');
-    await page.keyboard.up('z');
-    await waitUntil(2540);
-    const afterX = await score();
-    assert.notDeepEqual(afterX, afterZ, 'Left Arrow should align the second ring and X should score while Z is held');
-
-    await page.mouse.wheel(0, -120);
-    await waitUntil(3600);
-    await page.keyboard.down('x');
-    await waitUntil(3750);
-    assert.deepEqual(await score(), afterX, 'a repeated keydown should not score');
-    await page.keyboard.up('x');
-    await save('rhythm-miss');
-
-    await canvas.evaluate(element => element.ownerDocument.defaultView.dispatchEvent(new Event('blur')));
+    await click(1040, 42);
+    const zero = await hits();
+    await canvas.evaluate(element => new Promise((resolve, reject) => {
+      const win = element.ownerDocument.defaultView;
+      const dispatch = (key, code) => {
+        const options = { key, code, bubbles: true, cancelable: true };
+        element.dispatchEvent(new win.KeyboardEvent('keydown', options));
+        element.dispatchEvent(new win.KeyboardEvent('keyup', options));
+      };
+      const actions = [[1.23, 'z', 'KeyZ'], [1.85, 'ArrowLeft', 'ArrowLeft'], [2.23, 'x', 'KeyX']];
+      const deadline = win.performance.now() + 5000;
+      const timer = win.setInterval(() => {
+        if (win.performance.now() >= deadline) {
+          win.clearInterval(timer);
+          reject(new Error('Chart audio did not advance through the test notes.'));
+          return;
+        }
+        const [time, key, code] = actions[0];
+        if (win.lockpickerSongAudio.position() < time) return;
+        dispatch(key, code);
+        actions.shift();
+        if (!actions.length) {
+          win.clearInterval(timer);
+          resolve();
+        }
+      }, 8);
+    }));
     await page.waitForTimeout(100);
-    const paused = await center();
+    assert.notDeepEqual(await hits(), zero, 'timed inputs should score in a user chart');
+    await save('chart-playtest');
+    await canvas.evaluate(element => element.ownerDocument.defaultView.dispatchEvent(new Event('blur')));
     await page.waitForTimeout(200);
-    assert.deepEqual(await center(), paused, 'pause should freeze the chart');
-    await save('rhythm-paused');
+    const paused = await page.screenshot();
+    await page.waitForTimeout(200);
+    assert.deepEqual(await page.screenshot(), paused, 'a focus pause should hold the playback screen');
     await page.keyboard.press('z');
     await page.waitForTimeout(200);
-    assert.notDeepEqual(await center(), paused, 'Z should resume the chart');
-    assert.deepEqual(await score(), afterX, 'resume should preserve the score');
+    assert.notDeepEqual(await page.screenshot(), paused, 'Z should resume the chart');
+    await click(51, 42);
+    await click(197, 42);
+    await save('saved-charts');
 
-    await page.waitForTimeout(850);
-    const crashed = await center();
-    await page.waitForTimeout(200);
-    assert.deepEqual(await center(), crashed, 'the first unavoided spike should freeze the run');
-    await save('rhythm-spike-hit');
-    await page.keyboard.press('x');
-    await page.waitForTimeout(150);
-    assert.deepEqual(await score(), zero, 'X should start a fresh chart after a spike hit');
+    await page.reload();
+    const { canvas: reloadedCanvas } = await waitForGame();
+    const savedTitles = await reloadedCanvas.evaluate(element => new Promise((resolve, reject) => {
+      const request = element.ownerDocument.defaultView.indexedDB.open('lockpicker-charts', 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const charts = db.transaction('charts').objectStore('charts').getAll();
+        charts.onerror = () => reject(charts.error);
+        charts.onsuccess = () => resolve(charts.result.map(record => JSON.parse(record).title));
+        db.close();
+      };
+    }));
+    assert.deepEqual(savedTitles, ['Browser chart']);
+    await click(1036, 162);
+    await reloadedCanvas.evaluate(element => new Promise((resolve, reject) => {
+      const win = element.ownerDocument.defaultView;
+      const deadline = win.performance.now() + 5000;
+      const timer = win.setInterval(() => {
+        try {
+          if (win.lockpickerSongAudio.position() > 0.15) {
+            win.clearInterval(timer);
+            resolve();
+            return;
+          }
+        } catch {
+          // The audio clock is unavailable until the saved song loads.
+        }
+        if (win.performance.now() >= deadline) {
+          win.clearInterval(timer);
+          reject(new Error('The saved song did not start from the chart library.'));
+        }
+      }, 20);
+    }));
+    await click(51, 42);
 
     await page.setViewportSize({ width: 760, height: 600 });
-    await save('rhythm-resize');
+    await save('charts-resized');
     assert.deepEqual(await page.evaluate(() => [scrollX, scrollY]), [0, 0]);
     assert.deepEqual(errors, []);
-    console.log(`${engine}: arrow and wheel turns, timed Z and X hits, key-repeat suppression, pause, resume, spike crash, retry and resize passed at ${target}`);
+    console.log(`${engine}: chart library, song import, save, timed playtest, focus pause, resume, reload, saved-chart playback and resize passed`);
   } finally {
     await browser.close();
   }

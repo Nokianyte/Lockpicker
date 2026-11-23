@@ -4,7 +4,7 @@ config_version=5
 config/name="Lockpicker"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
-config/description="Turn the inner ring and tap Z or X on beat."
+config/description="Make and play rhythm charts for your own songs."
 
 [display]
 window/size/viewport_width=1100

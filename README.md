@@ -1,21 +1,12 @@
 # Lockpicker
 
-The rhythm prototype opens by default. Choose **Charts** to make or play a song chart, or **Arcade** to switch to the endless mode.
+Lockpicker opens directly to **Charts**, where you can create, edit, or play a chart for your own music.
 
 Open **Settings** to adjust the master volume. The setting is saved locally when you close the dialog.
 
-Scroll one notch or press the Left or Right Arrow to turn the innermost ring 60°. Line up its circle with the fixed red circle, then tap Z or X when both hexagons overlap on the beat.
-
-- **Z** and **X** are interchangeable. Either key starts the two-beat count-in, judges a tap during play, and resumes or replays from the corresponding screen. Each tap needs a fresh press.
-- **Perfect** (within 45 ms) earns 100 points. **Good** (within 100 ms) earns 50 points. Both require alignment.
-- A missed ring or an off-beat tap breaks the combo. The rest of the chart continues on schedule.
-- The prototype uses an eight-bar chart and an audible 100 BPM metronome. Watch the opening marker pulse as its ring reaches the tip.
-- Turn spike rings away from the red circle. A spike touching the circle ends the run. Safely passing a spike preserves your combo.
-- Losing window focus pauses the chart.
-
 ## Make a song chart
 
-Open **Charts → New chart** and import an MP3 or WAV file. Set the BPM and first-beat offset against the waveform, then choose a grid subdivision. Left-click a lane to place a note, Shift + left-click to place a spike, and right-click a marker to delete it. Drag a marker to move it. Use the wheel to scroll the timeline and Ctrl + wheel to zoom.
+Choose **New chart** and import an MP3 or WAV file. Set the BPM and first-beat offset against the waveform, then choose a grid subdivision. Left-click a lane to place a note, Shift + left-click to place a spike, and right-click a marker to delete it. Drag a marker to move it. Use the wheel to scroll the timeline and Ctrl + wheel to zoom.
 
 Choose **Left slider** (red) or **Right slider** (blue) from the placement menu below the grid, then click a lane to place it. Each slider rotates the center and target 60° on its beat, even if you miss it. Aim at the target circle and press the matching arrow to score the hit. The wheel still turns the incoming ring, and the arrows also turn it outside slider hit windows. The timeline’s **Target** row shows which way the center faces relative to the six chart lanes. Click the row to seek and see the exact direction at the playhead.
 
@@ -31,6 +22,8 @@ Use **Playtest** for the full chart or **Playtest from cursor** to start near th
 
 The center polygon and target circle have black outlines at rest on light backgrounds and light outlines on dark backgrounds. Both tint yellow for **Perfect** (within 35 ms), green for **Good** (within 70 ms), and red for a miss or spike hit. A miss or spike hit also flashes the screen edges red. **OK** hits within the 100 ms window count without a color flash.
 
+Losing window focus pauses playback. Press **Z** or **X** to resume a paused run.
+
 ## Run locally
 
 Install the standard (GDScript) Godot **4.7.2** editor. Import `project.godot`, then press F5 to run the main scene. Or, with the executable on PATH:
@@ -43,11 +36,10 @@ godot --path .
 
 ```sh
 godot --headless --path . --editor --import --quit
-godot --headless --path . --script tests/test_game.gd
 godot --headless --path . --script tests/test_rhythm.gd
 ```
 
-The deterministic suite covers rhythm tap windows, alignment, misses, pause, replay, and a full combo on the prototype chart. It also exercises the original arcade model.
+The chart suite covers startup, editing, song playback, timing judgments, sliders, and zones.
 
 ## Browser export
 
@@ -70,11 +62,8 @@ See [verification notes](docs/verification.md) for the tested build and browser 
 
 ## Project layout
 
-- `scripts/rhythm_run.gd`: chart, ring motion, and tap judgment.
-- `scripts/rhythm.gd`: rhythm scene, input, rendering, and metronome.
-- `scripts/run_model.gd`: original arcade simulation.
-- `scripts/wall_geometry.gd`: polygon outline and swept collision.
-- `scripts/main.gd`: original arcade scene controller.
-- `scripts/palette.gd`: shared colors for gameplay and the chart editor.
-- `scripts/tuning.gd`: gameplay constants.
-- `openspec/`: requirements, design decisions, and implementation checklist.
+- `scripts/app.gd` opens the chart library and manages navigation and Settings.
+- `scripts/chart_editor.gd` and `scripts/chart_library.gd` handle chart editing and storage.
+- `scripts/song_session.gd` and `scripts/song_arena.gd` handle chart judgments and gameplay rendering.
+- `scripts/wall_geometry.gd` and `scripts/tuning.gd` define polygon geometry and gameplay constants.
+- `openspec/` records requirements and design decisions.

@@ -19,6 +19,7 @@ enum Judgment { NONE, PERFECT, GOOD, OK, MISS }
 
 var events: Array[Dictionary] = []
 var slider_turns: Array[Dictionary] = []
+var input_circle_track: Array[Dictionary] = []
 var resolved := PackedByteArray()
 var energy := MAX_ENERGY
 var combo := 0
@@ -31,6 +32,7 @@ var feedback := ""
 var feedback_at := -INF
 var tint_judgment := Judgment.NONE
 var tint_at := -INF
+var tint_side := 0
 
 var _deadline_order: Array[int] = []
 var _deadline_cursor := 0
@@ -39,10 +41,11 @@ var _turn_from := 0.0
 var _turn_target := 0.0
 var _turn_started := -INF
 
-func setup(schedule: Array[Dictionary], length: float, cursor: float, start: float) -> void:
+func setup(schedule: Array[Dictionary], length: float, cursor: float, start: float, inputs: Array[Dictionary] = []) -> void:
 	time = start
 	duration = length
 	slider_turns = build_slider_turns(schedule)
+	input_circle_track = inputs
 	for event in schedule:
 		if event.time >= cursor and event.time < duration:
 			_deadline_order.append(events.size())
@@ -98,10 +101,14 @@ static func center_angle_at(turns: Array[Dictionary], at: float) -> float:
 		offset -= step - G.turn_angle(0.0, step, elapsed)
 	return T.TIP_ANGLE + offset
 
-static func note_target_angle(turns: Array[Dictionary], note: Dictionary, at: float) -> float:
+static func note_input_side(turns: Array[Dictionary], inputs: Array[Dictionary], note: Dictionary, angle: float, at: float) -> int:
 	# A slider's own scheduled turn must not pull its target away during the late hit window.
 	var aim_at := minf(at, note.time) if note.has("slider_direction") else at
-	return center_angle_at(turns, aim_at)
+	var center := center_angle_at(turns, aim_at)
+	var side := G.nearest_input_side(center, angle)
+	if (Chart.input_mask_at(inputs, aim_at) & (1 << side)) != 0 and G.gap_accepts_tip(G.input_angle(center, side), angle):
+		return side
+	return -1
 
 func _turn_inner(direction: float) -> void:
 	if energy == 0 or _inner >= events.size():
@@ -126,7 +133,10 @@ func advance_to(at: float, finishing: bool = false) -> void:
 		if resolved[index]:
 			continue
 		if event.spike:
-			if G.song_spike_aligns(ring_angle(index, event.time), center_angle(event.time)):
+			var angle := ring_angle(index, event.time)
+			var center := center_angle(event.time)
+			var side := G.nearest_input_side(center, angle)
+			if (Chart.input_mask_at(input_circle_track, event.time) & (1 << side)) != 0 and G.song_spike_aligns(angle, G.input_angle(center, side)):
 				spike_hits += 1
 				_penalize("Spike", deadline)
 		else:
@@ -148,7 +158,7 @@ func press_arrow(direction: int, at: float) -> void:
 	advance_to(at)
 	if energy == 0:
 		return
-	var index := _nearest_note(true)
+	var index := _nearest_note(true, direction)
 	if index < 0:
 		_turn_inner(direction)
 	elif int(events[index].slider_direction) != direction:
@@ -156,22 +166,32 @@ func press_arrow(direction: int, at: float) -> void:
 	else:
 		_hit_note(index)
 
-func _nearest_note(slider: bool) -> int:
+func _nearest_note(slider: bool, direction: int = 0) -> int:
 	var best := -1
+	var best_matches := false
 	var distance := HIT_WINDOW + CLOCK_EPSILON
 	for index in range(first_event_at(events, time - distance), events.size()):
 		var event := events[index]
 		if event.time > time + HIT_WINDOW + CLOCK_EPSILON:
 			break
 		var error := absf(event.time - time)
-		if not event.spike and event.has("slider_direction") == slider and not resolved[index] and error < distance:
+		if event.spike or event.has("slider_direction") != slider or resolved[index] or error > distance:
+			continue
+		var matches := (not slider or int(event.slider_direction) == direction) and _note_input_side(index) >= 0
+		# At a shared beat, prefer a note the player can hit with this input.
+		if error < distance or (best >= 0 and event.time == events[best].time and matches and not best_matches):
 			best = index
 			distance = error
+			best_matches = matches
 	return best
+
+func _note_input_side(index: int) -> int:
+	return note_input_side(slider_turns, input_circle_track, events[index], ring_angle(index, time), time)
 
 func _hit_note(index: int) -> void:
 	var note := events[index]
-	if not G.gap_accepts_tip(note_target_angle(slider_turns, note, time), ring_angle(index, time)):
+	var side := _note_input_side(index)
+	if side < 0:
 		_feedback("Wrong direction", time)
 		return
 	_resolve(index)
@@ -182,9 +202,9 @@ func _hit_note(index: int) -> void:
 	var error := absf(timing)
 	var timing_label := " · Early" if timing < 0.0 else " · Late"
 	if error <= PERFECT_WINDOW + CLOCK_EPSILON:
-		_judge(Judgment.PERFECT, "Perfect", time)
+		_judge(Judgment.PERFECT, "Perfect", time, side)
 	elif error <= GOOD_WINDOW + CLOCK_EPSILON:
-		_judge(Judgment.GOOD, "Good" + timing_label, time)
+		_judge(Judgment.GOOD, "Good" + timing_label, time, side)
 	else:
 		_judge(Judgment.OK, "OK" + timing_label, time)
 
@@ -220,10 +240,11 @@ func _feedback(message: String, at: float) -> void:
 	feedback = message
 	feedback_at = at
 
-func _judge(result: Judgment, message: String, at: float) -> void:
+func _judge(result: Judgment, message: String, at: float, side: int = 0) -> void:
 	if result != Judgment.OK:
 		tint_judgment = result
 		tint_at = at
+		tint_side = side
 	_feedback(message, at)
 
 func _penalize(message: String, at: float) -> void:

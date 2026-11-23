@@ -171,6 +171,29 @@ func _check_zone_motion() -> void:
 	_check(model.spike_hits == 1, "The spike must align with the fixed circle when the authored rotation has completed.")
 	_check(G.song_spike_aligns(T.TIP_ANGLE + deg_to_rad(7.0)) and not G.song_spike_aligns(T.TIP_ANGLE + deg_to_rad(8.0)), "A spike registers with its center inside the fixed circle, even while turning.")
 
+func _check_extra_input_circles() -> void:
+	var chart := Chart.new()
+	chart.audio_id = Chart.new_id()
+	chart.zones = [Chart.new_zone(2.0), Chart.new_zone(4.0)]
+	chart.zones[0].extra_input_sides = 1 << 1
+	var track := chart.input_circle_track()
+	_check(Chart.input_mask_at(track, 0.9) == 1 and Chart.input_mask_at(track, 1.0) == 3 and Chart.input_mask_at(track, 2.0) == 1, "Extra targets must switch exactly at zone boundaries.")
+	var model := Session.new()
+	var slider := _event(1.5, 1)
+	slider.slider_direction = 1
+	model.setup([_event(1.0, 2), _event(1.0, 1), slider, _event(1.8, 2, true), _event(2.1, 2)], 3.0, 0.0, 0.0, track)
+	model.press(1.0)
+	_check(model.hits == 1 and model.resolved[1] == 1 and model.tint_side == 1, "An extra target must allow a hit even when a simultaneous note is misaligned.")
+	model.press_arrow(1, 1.5)
+	_check(model.hits == 2 and model.tint_side == 1, "A slider must score at an enabled extra target.")
+	model.advance_to(1.8)
+	_check(model.spike_hits == 1, "The extra target must rotate with the slider and register a spike hit.")
+	model.press(2.1)
+	_check(model.hits == 2 and model.feedback == "Wrong direction", "An extra target from the previous zone must deactivate.")
+	_check(Chart.from_record(chart.record()).zones == chart.zones, "Extra input sides must survive saving and reopening.")
+	chart.zones[0].extra_input_sides = 63
+	_check(Chart.from_record(chart.record()) == null, "The mandatory primary side cannot be stored as an extra side.")
+
 func _check_center_rotation() -> void:
 	var chart := Chart.new()
 	chart.zones = [Chart.new_zone(2.0), Chart.new_zone(4.0), Chart.new_zone(6.0)]
@@ -313,6 +336,7 @@ func _check_storage(library: Library, arguments: PackedStringArray, wav: PackedB
 	chart.zones[0].spawn_radius = Chart.MAX_SPAWN_RADIUS
 	chart.zones[0].rotation_offset = -60.0
 	chart.zones[0].center_rotation_speed = -90.0
+	chart.zones[0].extra_input_sides = (1 << 1) | (1 << 5)
 	chart.events.append({"beat": 3.0, "lane": 2, "spike": false, "slider_direction": -1})
 	var with_zone := chart.record()
 	_check(Chart.from_record(with_zone).record() == with_zone, "Offscreen spawn distance and slider direction must round-trip with the chart.")
@@ -399,6 +423,8 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	editor._zone_fields.start_speed.value = 80.0
 	editor._zone_fields.center_rotation_speed.value = 120.0
 	editor._zone_colors.background_color.color_changed.emit(Color("24364a"))
+	editor._input_circles.get_popup().id_pressed.emit(1)
+	_check(chart.zones[0].extra_input_sides == 2 and editor._input_circles.get_popup().is_item_checked(0), "Choosing an input side must update the zone and its menu.")
 	editor._select_zone(-1)
 	var click := InputEventMouseButton.new()
 	click.position = Vector2(editor.timeline._x_at(2.0), editor.timeline.ZONE_HANDLE_Y)
@@ -414,6 +440,7 @@ func _check_zone_editor(app, wav: PackedByteArray) -> void:
 	_check(app.song.session.events[0].motion.rotation == editor.preview.events[0].motion.rotation, "Playtest and editor preview must share the zone's motion profile.")
 	_check(app.song.arena.center_rotation_track == editor.preview.center_rotation_track and is_equal_approx(Chart.center_rotation_at(app.song.arena.center_rotation_track, 2.75), PI / 6.0), "Playtest and preview must share the arena angle at a given song time.")
 	_check(app.song.arena.background_track == editor.preview.background_track and Chart.background_at(app.song.arena.background_track, 2.75) == Color("24364a"), "Playtest and preview must share the edited zone background.")
+	_check(app.song.session.input_circle_track == editor.preview.input_circle_track and Chart.input_mask_at(app.song.session.input_circle_track, 2.75) == 3, "Playtest and preview must share the enabled input sides.")
 	app.song._leave()
 	editor._delete_zone_button.pressed.emit()
 	_check(chart.zones.is_empty() and editor._chart_settings.visible and chart.events.size() == 1, "Deleting a zone must restore chart settings and preserve its notes and spikes.")
@@ -466,6 +493,7 @@ func _run() -> void:
 	_check_judgment_tints()
 	_check_sliders()
 	_check_zone_motion()
+	_check_extra_input_circles()
 	_check_center_rotation()
 	_check_zone_colors()
 	var app := AppScene.instantiate()

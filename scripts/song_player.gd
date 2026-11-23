@@ -115,7 +115,7 @@ func _restart() -> void:
 	_penalty_flash.reset()
 	var start := maxf(transport.playback_start, _cursor - Session.LEAD_IN)
 	session = Session.new()
-	session.setup(_schedule, transport.playback_end, _cursor, start)
+	session.setup(_schedule, transport.playback_end, _cursor, start, arena.input_circle_track)
 	session.penalized.connect(_penalty_flash.flash)
 	arena.session = session
 	transport.start_at(start)

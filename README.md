@@ -20,6 +20,8 @@ Use **+ Zone** to add a zone at the playhead. New zones copy the settings from t
 
 **Polygon start color** and **Polygon end color** tint incoming polygons as they travel. The color follows distance traveled, so it changes faster as the polygon speeds up. **Background color** changes the arena at the zone marker. Right-click any color swatch to restore its default.
 
+In zone settings, **Input circles** adds hit targets on selected sides relative to the main circle. The whole set rotates with the center. Notes and sliders can be hit at any active circle, and spikes can hit any of them. The timeline’s **Target** row shows the main circle’s direction.
+
 Use **Playtest** for the full chart or **Playtest from cursor** to start near the playhead. Use the mouse wheel or Left / Right Arrow to turn the innermost ring toward the target circle, then tap **Z** or **X** on the beat. Spikes are spiky circles and cost the same energy as a missed note if they line up with the target on their beat. Saved charts and their audio files stay in local game or browser storage.
 
 The center polygon and target circle have black outlines at rest on light backgrounds and light outlines on dark backgrounds. Both tint yellow for **Perfect** (within 35 ms), green for **Good** (within 70 ms), and red for a miss or spike hit. A miss or spike hit also flashes the screen edges red. **OK** hits within the 100 ms window count without a color flash.

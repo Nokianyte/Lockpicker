@@ -49,6 +49,7 @@ var _zone_settings: VBoxContainer
 var _zone_time: Label
 var _zone_fields: Dictionary[String, SpinBox] = {}
 var _zone_colors: Dictionary[String, ColorPickerButton] = {}
+var _input_circles: MenuButton
 var _file_dialog: FileDialog
 var _package_import_dialog: FileDialog
 var _package_export_dialog: FileDialog
@@ -296,7 +297,21 @@ func _build_zone_settings() -> VBoxContainer:
 	_add_zone_color(fields, "Polygon start color", "polygon_start_color")
 	_add_zone_color(fields, "Polygon end color", "polygon_end_color")
 	_zone_settings.add_child(HSeparator.new())
-	_zone_settings.add_child(UI.label("Additional effects", 15, UI.MUTED))
+	var effects := HBoxContainer.new()
+	_zone_settings.add_child(effects)
+	var effects_label := UI.label("Additional effects", 15, UI.MUTED)
+	effects_label.size_flags_horizontal = SIZE_EXPAND_FILL
+	effects.add_child(effects_label)
+	_input_circles = MenuButton.new()
+	_input_circles.flat = false
+	_input_circles.text = "Input circles"
+	_input_circles.tooltip_text = "Add targets on sides relative to the main circle. They rotate with the center."
+	var menu := _input_circles.get_popup()
+	menu.hide_on_checkable_item_selection = false
+	for side in range(1, Chart.DIRECTIONS.size()):
+		menu.add_check_item(Chart.DIRECTIONS[side], side)
+	menu.id_pressed.connect(_toggle_input_circle)
+	effects.add_child(_input_circles)
 	_zone_settings.hide()
 	return _zone_settings
 
@@ -616,6 +631,7 @@ func _refresh_actions() -> void:
 		field.editable = not _busy
 	for picker in _zone_colors.values():
 		picker.disabled = _busy
+	_input_circles.disabled = _busy
 	_start_offset.editable = not _busy and not no_song
 	_end_offset.editable = not _busy and not no_song
 
@@ -709,6 +725,23 @@ func _refresh_zone_settings() -> void:
 		_zone_fields[key].set_value_no_signal(zone[key])
 	for key in _zone_colors:
 		_zone_colors[key].color = Chart.zone_color(zone, key, Chart.ZONE_COLOR_DEFAULTS[key])
+	var menu := _input_circles.get_popup()
+	var mask := int(zone.get("extra_input_sides", 0))
+	var count := 1
+	for index in menu.item_count:
+		var enabled := (mask & (1 << menu.get_item_id(index))) != 0
+		menu.set_item_checked(index, enabled)
+		if enabled:
+			count += 1
+	_input_circles.text = "Input circles (%d)" % count
+
+func _toggle_input_circle(side: int) -> void:
+	if _busy or timeline.zone_selection < 0:
+		return
+	var zone := chart.zones[timeline.zone_selection]
+	var mask := int(zone.get("extra_input_sides", 0)) ^ (1 << side)
+	_change_zone(mask if mask != 0 else null, "extra_input_sides")
+	_refresh_zone_settings()
 
 func _move_zone(index: int, beat: float) -> void:
 	if _busy or chart.zone_at(beat) >= 0:

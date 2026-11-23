@@ -8,6 +8,8 @@ const MAX_BPM := 600.0
 const MIN_PLAYBACK_SECONDS := 0.001
 const SUBDIVISIONS := [1, 2, 4, 8, 16, 32]
 const DIRECTIONS := ["Up", "Upper right", "Lower right", "Down", "Lower left", "Upper left"]
+const PRIMARY_INPUT := 1
+const ALL_EXTRA_INPUTS := 0b111110
 const MIN_SPAWN_RADIUS := T.SONG_CORE_RADIUS + 1.0
 const MAX_SPAWN_RADIUS := 3000.0
 const DEFAULT_APPROACH := 1.65
@@ -121,6 +123,20 @@ func background_track() -> Array[Dictionary]:
 static func background_at(track: Array[Dictionary], at: float) -> Color:
 	var index := _segment_at(track, at)
 	return Palette.SURFACE if index < 0 else track[index].color
+
+func input_circle_track() -> Array[Dictionary]:
+	var track: Array[Dictionary] = []
+	var last_mask := PRIMARY_INPUT
+	for zone in zones:
+		var mask := PRIMARY_INPUT | int(zone.get("extra_input_sides", 0))
+		if mask != last_mask:
+			track.append({"time": time_at(zone.beat), "mask": mask})
+			last_mask = mask
+	return track
+
+static func input_mask_at(track: Array[Dictionary], at: float) -> int:
+	var index := _segment_at(track, at)
+	return PRIMARY_INPUT if index < 0 else track[index].mask
 
 static func zone_color(zone: Dictionary, key: String, fallback: Color) -> Color:
 	return Color.html(zone[key]) if zone.has(key) else fallback
@@ -267,11 +283,16 @@ static func from_record(record: Variant) -> RefCounted:
 		var center_speed: Variant = zone.get("center_rotation_speed", 0.0)
 		if not number_between(center_speed, -MAX_CENTER_ROTATION_SPEED, MAX_CENTER_ROTATION_SPEED):
 			return null
+		var extra_inputs: Variant = zone.get("extra_input_sides", 0)
+		if not number_between(extra_inputs, 0, ALL_EXTRA_INPUTS) or int(extra_inputs) != extra_inputs or (int(extra_inputs) & PRIMARY_INPUT) != 0:
+			return null
 		var settings := {
 			"beat": float(zone.beat), "spawn_radius": float(zone.spawn_radius),
 			"start_speed": float(zone.start_speed), "end_speed": float(zone.end_speed),
 			"rotation_offset": float(zone.rotation_offset), "center_rotation_speed": float(center_speed),
 		}
+		if extra_inputs != 0:
+			settings.extra_input_sides = int(extra_inputs)
 		for key in ZONE_COLOR_DEFAULTS:
 			if zone.has(key):
 				var color: Variant = zone[key]

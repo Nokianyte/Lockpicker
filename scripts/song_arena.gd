@@ -21,6 +21,7 @@ var slider_turns: Array[Dictionary] = []
 var approach_horizon := Chart.DEFAULT_APPROACH
 var center_rotation_track: Array[Dictionary] = []
 var background_track: Array[Dictionary] = []
+var input_circle_track: Array[Dictionary] = []
 var song_time := 0.0
 var session: Session
 var _grid := PackedVector2Array()
@@ -35,6 +36,7 @@ func configure(chart: Chart) -> void:
 	approach_horizon = chart.approach_horizon()
 	center_rotation_track = chart.center_rotation_track()
 	background_track = chart.background_track()
+	input_circle_track = chart.input_circle_track()
 
 func _build_grid() -> void:
 	_grid.clear()
@@ -64,6 +66,7 @@ func _draw() -> void:
 		draw_multiline(_grid, grid_ink)
 	var rotation := Chart.center_rotation_at(center_rotation_track, at)
 	var target_angle := Session.center_angle_at(turns, at)
+	var input_mask := Chart.input_mask_at(input_circle_track, at)
 	var tint := idle_ink
 	var age := INF
 	if session != null:
@@ -77,9 +80,12 @@ func _draw() -> void:
 	draw_set_transform(size * 0.5, rotation)
 	_draw_core(zoom, target_angle, Color(core_ink, wash_opacity), core_outline)
 	# Keep approaching markers, especially slider arrows, above the target's fill.
-	var target := G.song_marker(T.SONG_CORE_RADIUS, target_angle) * zoom
-	draw_circle(target, marker_radius, background.lerp(core_ink, wash_opacity), true, -1.0, true)
-	draw_arc(target, marker_radius, 0.0, TAU, 40, core_outline, 2.0, true)
+	var input_fill := background.lerp(core_ink, wash_opacity)
+	for side in Chart.DIRECTIONS.size():
+		if (input_mask & (1 << side)) != 0:
+			var target := G.song_marker(T.SONG_CORE_RADIUS, G.input_angle(target_angle, side)) * zoom
+			draw_circle(target, marker_radius, input_fill, true, -1.0, true)
+			draw_arc(target, marker_radius, 0.0, TAU, 40, core_outline, 2.0, true)
 	var first := Session.first_event_at(schedule, at - Session.HIT_WINDOW)
 	# The hexagon's nearest edge can reach a corner before any of its vertices enter view.
 	var marker_margin := maxf(slider_radius, marker_radius * Art.SPIKE_TIP_SCALE) + 2.0
@@ -111,7 +117,7 @@ func _draw() -> void:
 			Art.ring(self, Vector2.ZERO, zoom, radius, angle, Color(polygon_color, visibility * 0.33), 1.0)
 			spikes.append({"point": marker, "angle": angle, "ink": background.lerp(polygon_color, visibility)})
 		else:
-			var aligned := absf(remaining) <= Session.HIT_WINDOW and G.gap_accepts_tip(Session.note_target_angle(turns, event, at), angle)
+			var aligned := absf(remaining) <= Session.HIT_WINDOW and Session.note_input_side(turns, input_circle_track, event, angle, at) >= 0
 			var direction: int = event.get("slider_direction", 0)
 			var aim_color := Palette.slider_color(direction) if direction != 0 else Palette.RED
 			var ink := Color(aim_color if aligned else polygon_color, visibility)
@@ -127,7 +133,8 @@ func _draw() -> void:
 	# Draw opaque silhouettes over every ring, with their distance fade blended into the background.
 	for spike in spikes:
 		Art.spiky_circle(self, spike.point, marker_radius, spike.angle, spike.ink)
-	if session != null and session.tint_judgment != Session.Judgment.MISS and age < T.BREAK_TIME:
+	if session != null and session.tint_judgment != Session.Judgment.MISS and age < T.BREAK_TIME and (input_mask & (1 << session.tint_side)) != 0:
+		var target := G.song_marker(T.SONG_CORE_RADIUS, G.input_angle(target_angle, session.tint_side)) * zoom
 		var progress := age / T.BREAK_TIME
 		var pulse_radius := marker_radius * lerpf(0.8, 2.2, progress)
 		draw_arc(target, pulse_radius, 0.0, TAU, 40, Color(tint, 1.0 - progress), 1.6, true)

@@ -80,7 +80,7 @@ function testSong() {
     };
     const hits = () => page.screenshot({ clip: { x: 1005, y: 22, width: 75, height: 38 } });
     await save('charts');
-    await click(938, 45);
+    await click(829, 45);
     await save('settings');
     await click(550, 435);
     await click(1031, 45);
@@ -92,10 +92,15 @@ function testSong() {
     await screen.locator('input[type=file]').setInputFiles(testSong(), { timeout: 8000 });
     await page.waitForTimeout(500);
     await click(235, 480);
+    await page.keyboard.down('Shift');
+    await click(235, 589);
+    await page.keyboard.up('Shift');
     await click(358, 518);
     await click(965, 42);
     await page.waitForTimeout(300);
     await save('chart-editor');
+    await click(218, 439);
+    await save('spike-preview');
 
     await click(1040, 42);
     const zero = await hits();
@@ -140,19 +145,19 @@ function testSong() {
     await save('saved-charts');
 
     await page.reload();
-    const { canvas: reloadedCanvas } = await waitForGame();
-    const savedTitles = await reloadedCanvas.evaluate(element => new Promise((resolve, reject) => {
+    const { canvas: reloadedCanvas, screen: reloadedScreen } = await waitForGame();
+    const readCharts = () => reloadedCanvas.evaluate(element => new Promise((resolve, reject) => {
       const request = element.ownerDocument.defaultView.indexedDB.open('lockpicker-charts', 1);
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {
         const db = request.result;
         const charts = db.transaction('charts').objectStore('charts').getAll();
         charts.onerror = () => reject(charts.error);
-        charts.onsuccess = () => resolve(charts.result.map(record => JSON.parse(record).title));
+        charts.onsuccess = () => resolve(charts.result.map(record => JSON.parse(record)));
         db.close();
       };
     }));
-    assert.deepEqual(savedTitles, ['Browser chart']);
+    assert.deepEqual((await readCharts()).map(chart => chart.title), ['Browser chart']);
     await click(1036, 162);
     await reloadedCanvas.evaluate(element => new Promise((resolve, reject) => {
       const win = element.ownerDocument.defaultView;
@@ -175,11 +180,31 @@ function testSong() {
     }));
     await click(51, 42);
 
+    await click(917, 162);
+    await save('chart-export');
+    const downloadPromise = page.waitForEvent('download', { timeout: 8000 });
+    await page.keyboard.press('Enter');
+    const download = await downloadPromise;
+    assert.equal(download.suggestedFilename(), 'Browser chart.lockchart');
+    const packageBytes = fs.readFileSync(await download.path());
+    assert.equal(packageBytes.toString('ascii', 0, 4), 'LKC1');
+    assert.ok(packageBytes.subarray(12 + packageBytes.readUInt32LE(4)).equals(testSong().buffer), 'export retains the original audio');
+    await click(925, 45);
+    await reloadedScreen.locator('input[type=file]').setInputFiles({
+      name: 'Browser chart.lockchart', mimeType: 'application/octet-stream', buffer: packageBytes,
+    });
+    await page.waitForTimeout(500);
+    const copies = await readCharts();
+    assert.equal(copies.length, 2);
+    assert.notEqual(copies[0].id, copies[1].id);
+    assert.notEqual(copies[0].audio_id, copies[1].audio_id);
+    assert.deepEqual(copies[0].events, copies[1].events);
+
     await page.setViewportSize({ width: 760, height: 600 });
     await save('charts-resized');
     assert.deepEqual(await page.evaluate(() => [scrollX, scrollY]), [0, 0]);
     assert.deepEqual(errors, []);
-    console.log(`${engine}: chart library, song import, save, timed playtest, focus pause, resume, reload, saved-chart playback and resize passed`);
+    console.log(`${engine}: chart library, song import, timed playback, pause/resume, chart package export/import and resize passed`);
   } finally {
     await browser.close();
   }

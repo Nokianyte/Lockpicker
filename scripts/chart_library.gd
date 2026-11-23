@@ -3,7 +3,10 @@ extends Node
 signal web_finished(result: Array)
 
 const Chart = preload("res://scripts/song_chart.gd")
-const MAX_AUDIO_BYTES := 128 * 1024 * 1024
+const Package = preload("res://scripts/chart_package.gd")
+const MAX_AUDIO_BYTES := Package.MAX_AUDIO_BYTES
+const AUDIO_SIZE_ERROR := "Choose an MP3 or WAV file under 128 MiB."
+const PACKAGE_SIZE_ERROR := "This chart package is too large."
 const MP3_DECODE_RATE := 44100
 const MP3_FRAMES_PER_PASS := 32768
 const PCM_STEREO_FRAME_BYTES := 4
@@ -68,10 +71,10 @@ window.lockpickerChartStorage = (function () {
 				}
 			}));
 		},
-		pick(callback, limit) {
+		pick(callback, accept, limit, sizeError) {
 			const input = document.createElement('input');
 			input.type = 'file';
-			input.accept = '.mp3,.wav,audio/mpeg,audio/wav,audio/wave';
+			input.accept = accept;
 			input.hidden = true;
 			document.body.appendChild(input);
 			input.addEventListener('cancel', () => {
@@ -82,11 +85,11 @@ window.lockpickerChartStorage = (function () {
 				const file = input.files[0];
 				input.remove();
 				if (!file) return callback('');
-				if (file.size > limit) return callback('Choose an MP3 or WAV file under 128 MiB.');
+				if (file.size > limit) return callback(sizeError);
 				try {
 					callback('', file.name, await file.arrayBuffer());
 				} catch (error) {
-					callback(error.message || 'Could not read the song.');
+					callback(error.message || 'Could not read the selected file.');
 				}
 			}, {once: true});
 			input.click();
@@ -132,6 +135,15 @@ func list_charts() -> Dictionary:
 	return {"charts": charts}
 
 func read_chart(id: String) -> Dictionary:
+	var data := await _read_chart_data(id)
+	if data.has("error"):
+		return data
+	var stream := await decode_song(data.audio, data.chart.audio_name)
+	if stream == null:
+		return {"error": "The saved song could not be opened."}
+	return {"chart": data.chart, "stream": stream}
+
+func _read_chart_data(id: String) -> Dictionary:
 	if not Chart.valid_id(id):
 		return {"error": "The chart ID is invalid."}
 	var record: Variant
@@ -152,10 +164,34 @@ func read_chart(id: String) -> Dictionary:
 		return {"error": "Could not read this chart."}
 	if _web == null:
 		bytes = FileAccess.get_file_as_bytes(_audio_path(chart.audio_id, chart.audio_name))
-	var stream := await decode_song(bytes, chart.audio_name)
-	if stream == null:
+	if bytes.is_empty():
 		return {"error": "The saved song could not be opened."}
-	return {"chart": chart, "stream": stream}
+	return {"chart": chart, "audio": bytes}
+
+func import_package(bytes: PackedByteArray) -> String:
+	var data := Package.unpack(bytes)
+	if data.is_empty():
+		return "Could not read this .lockchart package."
+	var chart: Chart = data.chart
+	if await decode_song(data.audio, chart.audio_name) == null:
+		return "Could not open the song in this chart package."
+	chart.id = Chart.new_id()
+	chart.audio_id = Chart.new_id()
+	return await save_chart(chart, data.audio)
+
+func export_package(id: String) -> Dictionary:
+	var data := await _read_chart_data(id)
+	if data.has("error"):
+		return data
+	var bytes := Package.pack(data.chart, data.audio)
+	if bytes.is_empty():
+		return {"error": "Could not package this chart and its song."}
+	return {"name": data.chart.title.strip_edges().validate_filename() + "." + Package.EXTENSION, "bytes": bytes}
+
+func write_package_file(path: String, bytes: PackedByteArray) -> String:
+	if path.get_extension().to_lower() != Package.EXTENSION:
+		path += "." + Package.EXTENSION
+	return "" if _write_atomic(path, bytes) else "Could not write the chart package."
 
 func save_chart(chart, new_audio: PackedByteArray) -> String:
 	var record: Dictionary = chart.record()
@@ -178,9 +214,15 @@ func save_chart(chart, new_audio: PackedByteArray) -> String:
 	return ""
 
 func pick_web_song() -> Dictionary:
+	return await _pick_web_file(".mp3,.wav,audio/mpeg,audio/wav,audio/wave", MAX_AUDIO_BYTES, AUDIO_SIZE_ERROR)
+
+func pick_web_package() -> Dictionary:
+	return await _pick_web_file("." + Package.EXTENSION, Package.MAX_FILE_BYTES, PACKAGE_SIZE_ERROR)
+
+func _pick_web_file(accept: String, limit: int, size_error: String) -> Dictionary:
 	if _web == null:
 		return {"error": "The browser file picker is unavailable."}
-	_web.pick(_callback, MAX_AUDIO_BYTES)
+	_web.pick(_callback, accept, limit, size_error)
 	var response: Array = await web_finished
 	if response[0] != "":
 		return {"error": response[0]}
@@ -189,11 +231,17 @@ func pick_web_song() -> Dictionary:
 	return {"name": response[1], "bytes": response[2]}
 
 static func read_song_file(path: String) -> Dictionary:
+	return _read_selected_file(path, MAX_AUDIO_BYTES, AUDIO_SIZE_ERROR)
+
+static func read_package_file(path: String) -> Dictionary:
+	return _read_selected_file(path, Package.MAX_FILE_BYTES, PACKAGE_SIZE_ERROR)
+
+static func _read_selected_file(path: String, limit: int, size_error: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		return {"error": "Could not read the selected song."}
-	if file.get_length() > MAX_AUDIO_BYTES:
-		return {"error": "Choose an MP3 or WAV file under 128 MiB."}
+		return {"error": "Could not read the selected file."}
+	if file.get_length() > limit:
+		return {"error": size_error}
 	return {"name": path.get_file(), "bytes": file.get_buffer(file.get_length())}
 
 func decode_song(bytes: PackedByteArray, filename: String) -> AudioStreamWAV:

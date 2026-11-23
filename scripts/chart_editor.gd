@@ -50,6 +50,10 @@ var _zone_time: Label
 var _zone_fields: Dictionary[String, SpinBox] = {}
 var _zone_colors: Dictionary[String, ColorPickerButton] = {}
 var _file_dialog: FileDialog
+var _package_import_dialog: FileDialog
+var _package_export_dialog: FileDialog
+var _download_dialog: ConfirmationDialog
+var _export_data := {}
 var _leave_dialog: ConfirmationDialog
 
 func _ready() -> void:
@@ -79,6 +83,7 @@ func _ready() -> void:
 	_file_dialog.filters = PackedStringArray(["*.mp3, *.wav ; MP3 or WAV audio"])
 	_file_dialog.file_selected.connect(func(path: String) -> void: _accept_song(Library.read_song_file(path)))
 	add_child(_file_dialog)
+	_build_package_dialogs()
 	_leave_dialog = ConfirmationDialog.new()
 	_leave_dialog.title = "Unsaved chart"
 	_leave_dialog.dialog_text = "Discard the edits since your last save?"
@@ -100,6 +105,31 @@ func _ready() -> void:
 	_waveform.updated.connect(_waveform_updated)
 	resized.connect(_resize_panels)
 
+func _build_package_dialogs() -> void:
+	if OS.has_feature("web"):
+		_download_dialog = ConfirmationDialog.new()
+		_download_dialog.title = "Export chart"
+		_download_dialog.dialog_text = "Download the chart and its song as one .lockchart file."
+		_download_dialog.ok_button_text = "Download"
+		_download_dialog.confirmed.connect(_download_package)
+		_download_dialog.canceled.connect(_clear_export)
+		add_child(_download_dialog)
+		return
+	_package_import_dialog = _package_dialog("Import chart", FileDialog.FILE_MODE_OPEN_FILE)
+	_package_import_dialog.file_selected.connect(func(path: String) -> void: _accept_package(Library.read_package_file(path)))
+	_package_export_dialog = _package_dialog("Export chart", FileDialog.FILE_MODE_SAVE_FILE)
+	_package_export_dialog.file_selected.connect(_write_package)
+	_package_export_dialog.canceled.connect(_clear_export)
+
+func _package_dialog(title: String, mode: FileDialog.FileMode) -> FileDialog:
+	var dialog := FileDialog.new()
+	dialog.title = title
+	dialog.access = FileDialog.ACCESS_FILESYSTEM
+	dialog.file_mode = mode
+	dialog.filters = PackedStringArray(["*.lockchart ; Lockpicker chart package"])
+	add_child(dialog)
+	return dialog
+
 func _build_library() -> VBoxContainer:
 	var screen := VBoxContainer.new()
 	var header := HBoxContainer.new()
@@ -108,6 +138,7 @@ func _build_library() -> VBoxContainer:
 	heading.size_flags_horizontal = SIZE_EXPAND_FILL
 	header.add_child(heading)
 	header.add_child(UI.button("Settings", settings_requested.emit))
+	header.add_child(UI.button("Import chart", _import_package))
 	header.add_child(UI.button("New chart", func() -> void:
 		if not _busy:
 			_open_editor(Chart.new(), null)
@@ -373,6 +404,7 @@ func _add_library_row(entry: Dictionary) -> void:
 	info.add_child(UI.label(entry.title, 20))
 	info.add_child(UI.label(entry.audio_name, 14, UI.MUTED))
 	row.add_child(info)
+	row.add_child(UI.button("Export", _export_package.bind(entry.id)))
 	row.add_child(UI.button("Edit", _open_saved.bind(entry.id, false)))
 	row.add_child(UI.button("Play", _open_saved.bind(entry.id, true), true))
 
@@ -390,6 +422,66 @@ func _open_saved(id: String, play: bool) -> void:
 		play_requested.emit(result.chart, result.stream, 0.0, false)
 	else:
 		_open_editor(result.chart, result.stream)
+
+func _import_package() -> void:
+	if _busy:
+		return
+	if _package_import_dialog != null:
+		_package_import_dialog.popup_centered_ratio(0.68)
+		return
+	_busy = true
+	var result := await library.pick_web_package()
+	_busy = false
+	_accept_package(result)
+
+func _accept_package(result: Dictionary) -> void:
+	if _busy or result.is_empty():
+		return
+	if result.has("error"):
+		_library_status.text = result.error
+		return
+	_busy = true
+	_library_status.text = "Importing chart…"
+	var error := await library.import_package(result.bytes)
+	_busy = false
+	if error.is_empty():
+		await show_charts()
+		_library_status.text = "Chart imported"
+	else:
+		_library_status.text = error
+
+func _export_package(id: String) -> void:
+	if _busy:
+		return
+	_busy = true
+	_library_status.text = "Preparing chart package…"
+	var result := await library.export_package(id)
+	_busy = false
+	if result.has("error"):
+		_library_status.text = result.error
+		return
+	_export_data = result
+	_library_status.text = ""
+	if _download_dialog != null:
+		# Keep the download itself in a click handler after the async storage read.
+		_download_dialog.popup_centered()
+	else:
+		_package_export_dialog.current_file = result.name
+		_package_export_dialog.popup_centered_ratio(0.68)
+
+func _clear_export() -> void:
+	_export_data = {}
+
+func _download_package() -> void:
+	if not _export_data.is_empty():
+		JavaScriptBridge.download_buffer(_export_data.bytes, _export_data.name)
+		_clear_export()
+
+func _write_package(path: String) -> void:
+	if not _export_data.is_empty():
+		var error := library.write_package_file(path, _export_data.bytes)
+		_library_status.text = "Chart exported" if error.is_empty() else error
+		_clear_export()
 
 func _open_editor(draft: Chart, stream: AudioStreamWAV) -> void:
 	chart = draft
@@ -701,6 +793,7 @@ func _play(from_cursor: bool) -> void:
 		pause_preview()
 		var cursor := transport.song_time() if from_cursor else transport.playback_start
 		if cursor < transport.playback_end:
+			transport.unlock_audio()
 			play_requested.emit(chart, transport.song, cursor, true)
 
 func _process(_delta: float) -> void:

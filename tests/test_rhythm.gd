@@ -3,6 +3,7 @@ extends SceneTree
 const AppScene = preload("res://scenes/main.tscn")
 const Chart = preload("res://scripts/song_chart.gd")
 const Library = preload("res://scripts/chart_library.gd")
+const Package = preload("res://scripts/chart_package.gd")
 const Session = preload("res://scripts/song_session.gd")
 const T = preload("res://scripts/tuning.gd")
 const G = preload("res://scripts/wall_geometry.gd")
@@ -325,6 +326,10 @@ func _check_storage(library: Library, arguments: PackedStringArray, wav: PackedB
 	var with_duplicate := with_zone.duplicate(true)
 	with_duplicate.zones.append(Chart.new_zone(1.5))
 	_check(Chart.from_record(with_duplicate) == null, "Two zones cannot share the same start marker.")
+	var package := Package.pack(chart, wav)
+	var unpacked := Package.unpack(package)
+	_check(unpacked.has("chart") and unpacked.chart.record() == chart.record() and unpacked.audio == wav, "A chart package must preserve settings, notes, and the original audio bytes.")
+	_check(Package.unpack(package.slice(0, package.size() - 1)).is_empty(), "A truncated chart package must be rejected.")
 	if arguments.size() != 2:
 		return
 	library.directory = arguments[1]
@@ -332,16 +337,25 @@ func _check_storage(library: Library, arguments: PackedStringArray, wav: PackedB
 		_check(await library.save_chart(chart, wav) == "", "Native save must write the chart and audio.")
 		chart.title = "Updated timing check"
 		_check(await library.save_chart(chart, PackedByteArray()) == "", "Saving an existing chart must replace its metadata.")
+		var exported := await library.export_package(chart.id)
+		var shared_path := library.directory.path_join("Shared")
+		_check(exported.has("bytes") and library.write_package_file(shared_path, exported.bytes).is_empty(), "A saved chart must export to a .lockchart file.")
+		var readback := Library.read_package_file(shared_path + ".lockchart")
+		_check(readback.has("bytes") and await library.import_package(readback.bytes) == "", "A chart package must import into the library as a copy.")
 		chart.audio_id = Chart.new_id()
 		_check(await library.save_chart(chart, PackedByteArray()) != "", "Missing replacement audio must reject the save.")
 	elif arguments[0] == "read":
 		var library_index: Dictionary = await library.list_charts()
-		_check(library_index.charts.size() == 1, "The saved chart must appear after a fresh process starts.")
+		_check(library_index.charts.size() == 2, "The original chart and imported copy must appear after a fresh process starts.")
 		var saved: Dictionary = await library.read_chart(chart.id)
 		_check(saved.has("chart") and saved.chart.title == "Updated timing check", "The last successful native save must survive a restart.")
 		_check(saved.has("stream") and is_equal_approx(saved.stream.get_length(), 6.0), "The saved song must reopen without another import.")
 		_check(saved.has("chart") and saved.chart.zones == chart.zones, "Saved zone settings must survive a fresh process.")
 		_check(saved.has("chart") and saved.chart.events == chart.events, "Saved sliders must survive a fresh process.")
+		for entry in library_index.charts:
+			if entry.id != chart.id:
+				var imported := await library.read_chart(entry.id)
+				_check(imported.has("chart") and imported.chart.audio_id != chart.audio_id and imported.chart.events == chart.events and imported.stream.data == saved.stream.data, "Import must create separate IDs and preserve the playable song.")
 
 func _check_song_offsets(app, wav: PackedByteArray) -> void:
 	var editor = app.editor

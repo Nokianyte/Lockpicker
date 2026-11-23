@@ -86,6 +86,7 @@ func _draw() -> void:
 	var visible_radius := (size.length() * 0.5 + marker_margin) / (zoom * cos(PI / 6.0))
 	var visible_horizon := (visible_radius - T.SONG_CORE_RADIUS) / Chart.MIN_APPROACH_SPEED
 	var stop := Session.first_event_at(schedule, at + minf(approach_horizon, visible_horizon))
+	var spikes: Array[Dictionary] = []
 	for index in range(stop - 1, first - 1, -1):
 		if session != null and session.resolved[index]:
 			continue
@@ -108,7 +109,7 @@ func _draw() -> void:
 		var polygon_color := Chart.approach_color(motion, approach, Palette.SPIKE if event.spike else foreground)
 		if event.spike:
 			Art.ring(self, Vector2.ZERO, zoom, radius, angle, Color(polygon_color, visibility * 0.33), 1.0)
-			Art.spiky_circle(self, marker, marker_radius, angle, Color(polygon_color, visibility))
+			spikes.append({"point": marker, "angle": angle, "ink": background.lerp(polygon_color, visibility)})
 		else:
 			var aligned := absf(remaining) <= Session.HIT_WINDOW and G.gap_accepts_tip(Session.note_target_angle(turns, event, at), angle)
 			var direction: int = event.get("slider_direction", 0)
@@ -123,6 +124,9 @@ func _draw() -> void:
 				Art.slider_marker(self, marker, slider_radius, axis, Color(aim_color, visibility), maxf(width, slider_radius * 0.18))
 			else:
 				draw_arc(marker, marker_radius, 0.0, TAU, 40, ink, width, true)
+	# Draw opaque silhouettes over every ring, with their distance fade blended into the background.
+	for spike in spikes:
+		Art.spiky_circle(self, spike.point, marker_radius, spike.angle, spike.ink)
 	if session != null and session.tint_judgment != Session.Judgment.MISS and age < T.BREAK_TIME:
 		var progress := age / T.BREAK_TIME
 		var pulse_radius := marker_radius * lerpf(0.8, 2.2, progress)

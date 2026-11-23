@@ -8,6 +8,8 @@ Open **Settings** to adjust the master volume. The setting is saved locally when
 
 Choose **New chart** and import an MP3 or WAV file. Set the BPM and first-beat offset against the waveform, then choose a grid subdivision. Left-click a lane to place a note, Shift + left-click to place a spike, and right-click a marker to delete it. Drag a marker to move it. Use the wheel to scroll the timeline and Ctrl + wheel to zoom.
 
+To share a saved chart, choose **Export** in the Charts library. The `.lockchart` package includes the original audio. Choose **Import chart** on the same screen to add the package as a separate chart.
+
 Choose **Left slider** (red) or **Right slider** (blue) from the placement menu below the grid, then click a lane to place it. Each slider rotates the center and target 60° on its beat, even if you miss it. Aim at the target circle and press the matching arrow to score the hit. The wheel still turns the incoming ring, and the arrows also turn it outside slider hit windows. The timeline’s **Target** row shows which way the center faces relative to the six chart lanes. Click the row to seek and see the exact direction at the playhead.
 
 In **Info / Settings**, set **Start offset** and **End offset** to skip seconds from either end of the song. The grid stays aligned to the original recording, with trimmed sections shaded on the timeline.

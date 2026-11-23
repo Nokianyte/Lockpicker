@@ -6,7 +6,7 @@ const WEB_AUDIO := """
 window.lockpickerSongAudio ??= (function () {
 	let context, gain, buffer, songId, source;
 	let volume = 1;
-	let started = 0, offset = 0, limit = 0;
+	let started = null, request = null, offset = 0, limit = 0;
 	function prepare() {
 		if (context) return;
 		context = new AudioContext();
@@ -16,7 +16,20 @@ window.lockpickerSongAudio ??= (function () {
 	}
 	function unlock() {
 		prepare();
-		context.resume().catch(() => {});
+		return context.resume().catch(() => {});
+	}
+	function position() {
+		if (started === null || context.state !== 'running') return offset;
+		let clock;
+		if (context.getOutputTimestamp) {
+			const output = context.getOutputTimestamp();
+			if (!output.performanceTime) return offset;
+			const elapsed = (performance.now() - output.performanceTime) / 1000;
+			clock = Math.min(context.currentTime, output.contextTime + elapsed);
+		} else {
+			clock = context.currentTime - (context.baseLatency || 0) - (context.outputLatency || 0);
+		}
+		return Math.min(limit, offset + Math.max(0, clock - started));
 	}
 	return {
 		unlock,
@@ -48,26 +61,34 @@ window.lockpickerSongAudio ??= (function () {
 			songId = id;
 		},
 		play(position, end) {
-			unlock();
-			source = context.createBufferSource();
-			source.buffer = buffer;
-			source.connect(gain);
-			started = context.currentTime;
+			const ready = unlock();
+			const song = buffer;
+			const current = {};
+			request = current;
+			started = null;
 			offset = position;
 			limit = end;
-			source.start(started, offset, end - position);
+			const start = () => {
+				if (request !== current || context.state !== 'running') return;
+				source = context.createBufferSource();
+				source.buffer = song;
+				source.connect(gain);
+				started = context.currentTime + 0.04;
+				source.start(started, position, end - position);
+			};
+			if (context.state === 'running') start();
+			else ready.then(start);
 		},
 		stop() {
+			request = null;
+			offset = position();
+			started = null;
 			if (!source) return;
 			source.stop();
 			source.disconnect();
 			source = null;
 		},
-		position() {
-			const audible = context.getOutputTimestamp?.().contextTime;
-			const clock = audible > 0 ? audible : context.currentTime - (context.baseLatency || 0) - (context.outputLatency || 0);
-			return Math.min(limit, offset + Math.max(0, clock - started));
-		}
+		position
 	};
 })()
 """
@@ -78,7 +99,8 @@ var playback_start := 0.0
 var playback_end := 0.0
 var _position := 0.0
 var _native_start := 0.0
-var _output_latency := 0.0
+var _native_play_position := 0.0
+var _output_latency := -1.0
 var _tail_start_usec := 0
 var _tail_position := 0.0
 var _web: JavaScriptObject
@@ -128,8 +150,9 @@ func resume_song() -> void:
 	if _web == null:
 		if stream == null:
 			_prepare_native_stream()
-		_output_latency = AudioServer.get_output_latency()
-		play(maxf(0.0, _position - _native_start))
+		_output_latency = -1.0
+		_native_play_position = maxf(0.0, _position - _native_start)
+		play(_native_play_position)
 	else:
 		var id := str(song.get_instance_id())
 		if not _web.hasSong(id):
@@ -180,12 +203,19 @@ func song_time() -> float:
 	elif _tail_start_usec > 0:
 		_position = minf(playback_end, _tail_position + (Time.get_ticks_usec() - _tail_start_usec) / 1000000.0)
 	elif playing and has_stream_playback():
-		var position := _native_start + get_playback_position() + AudioServer.get_time_since_last_mix() - _output_latency
+		var mixed_position := get_playback_position()
+		if _output_latency < 0.0:
+			if mixed_position <= _native_play_position:
+				return _position
+			_output_latency = AudioServer.get_output_latency()
+		var position := _native_start + mixed_position + AudioServer.get_time_since_last_mix() - _output_latency
 		_position = clampf(position, _position, playback_end)
 	return _position
 
 func _audio_finished() -> void:
 	if running:
+		if _output_latency < 0.0:
+			_output_latency = AudioServer.get_output_latency()
 		_tail_position = maxf(_position, playback_end - _output_latency)
 		_tail_start_usec = Time.get_ticks_usec()
 
